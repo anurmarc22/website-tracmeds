@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Thank You — Download TracMeds</title>
+  <meta name="description" content="Thank you for getting TracMeds. Use this page as the download destination while the app stores are still being approved." />
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #12193a;
+      --navy-900: #0c1530;
+      --violet: #6f4fd8;
+      --amber: #f2a91b;
+      --paper: #f2f4fb;
+      --card: #ffffff;
+      --muted: #5c6785;
+      --line: rgba(18, 25, 58, 0.09);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Inter', Arial, sans-serif;
+      background: linear-gradient(180deg, #f7f8fd 0%, var(--paper) 100%);
+      color: var(--ink);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .card {
+      width: min(720px, 100%);
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      box-shadow: 0 20px 60px rgba(12, 21, 64, 0.12);
+      padding: 36px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(111, 79, 216, 0.12);
+      color: var(--violet);
+      font-weight: 700;
+      font-size: 0.82rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+    h1 {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: clamp(1.8rem, 3.2vw, 2.6rem);
+      line-height: 1.15;
+      margin: 0 0 12px;
+    }
+    p { color: var(--muted); line-height: 1.7; margin: 0 0 12px; }
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 22px 0 24px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 18px;
+      border-radius: 999px;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+    .btn-primary { background: linear-gradient(100deg, var(--violet) 0%, var(--amber) 100%); color: #0c1530; }
+    .btn-secondary { background: var(--paper); color: var(--ink); border: 1px solid var(--line); }
+    .status-box {
+      background: #fffdf7;
+      border: 1px solid rgba(242, 169, 27, 0.3);
+      border-radius: 16px;
+      padding: 18px;
+      margin-top: 8px;
+    }
+    .status-box strong { color: var(--ink); }
+    ul { margin: 10px 0 0 18px; color: var(--muted); line-height: 1.7; }
+    .footer-note { font-size: 0.92rem; margin-top: 22px; }
+    @media (max-width: 640px) {
+      .card { padding: 24px; }
+      .actions { flex-direction: column; }
+      .btn { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="badge">✓ Payment received</div>
+    <h1>Thank you for getting TracMeds</h1>
+    <p>Your purchase is received and your request has been noted. We’re preparing the final download experience for you.</p>
+
+    <div class="status-box">
+      <strong>Current status:</strong>
+      <p>App store approval is still pending, so the direct download links are not live yet.</p>
+      <p>That means you can return to this page whenever you are ready to download the app once the links are available.</p>
+    </div>
+
+    <div class="actions">
+      <a class="btn btn-primary" href="/">Back to TracMeds website</a>
+      <a class="btn btn-secondary" href="mailto:support@tracmeds.com">Contact support</a>
+    </div>
+
+    <div class="status-box">
+      <strong>Download options</strong>
+      <div class="actions" style="margin: 12px 0 0;">
+        <a class="btn btn-secondary" href="#" onclick="return false;">Android — Coming soon</a>
+        <a class="btn btn-secondary" href="#" onclick="return false;">iPhone / iPad — Coming soon</a>
+      </div>
+    </div>
+
+    <div class="status-box" style="margin-top: 16px;">
+      <strong>Install instructions</strong>
+      <ul>
+        <li>Once the download links are published, open the link on your phone and follow the on-screen installation steps.</li>
+        <li>If you are using Android, allow installation from trusted sources if prompted by your device.</li>
+        <li>If you are using iPhone or iPad, follow the App Store or TestFlight instructions provided when the link is available.</li>
+      </ul>
+    </div>
+
+    <div class="status-box" style="margin-top: 16px; background: #f8f9ff; border-color: rgba(111, 79, 216, 0.2);">
+      <strong>Need help?</strong>
+      <p style="margin-top: 8px;">If you have any questions before the links are live, email us and we will help you with the next step.</p>
+      <p style="margin-top: 8px;"><a href="mailto:support@tracmeds.com" style="color: var(--violet); font-weight: 700;">support@tracmeds.com</a></p>
+    </div>
+
+    <p class="footer-note">If you need help before the links are published, email <a href="mailto:support@tracmeds.com" style="color: var(--violet); font-weight: 700;">support@tracmeds.com</a>.</p>
+  </main>
+</body>
+</html>
