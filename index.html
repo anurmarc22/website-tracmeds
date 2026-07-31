@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TracMeds — Your Daily Family Health Sharing App</title>
+<meta name="description" content="TracMeds is your daily family health sharing app — track medicines, appointments, and health readings, and share a daily summary with the people who matter, straight from your device." />
+<link rel="icon" type="image/png" href="favicon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --ink:#12193a;
+    --navy-900:#0c1530;
+    --navy-800:#132157;
+    --violet:#6f4fd8;
+    --violet-dark:#4f36a8;
+    --amber:#f2a91b;
+    --paper:#f2f4fb;
+    --card:#ffffff;
+    --muted:#5c6785;
+    --line: rgba(18,25,58,0.09);
+    --capsule: linear-gradient(100deg, var(--violet) 0%, var(--violet) 48%, var(--amber) 52%, var(--amber) 100%);
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    font-family:'Inter', Arial, sans-serif;
+    color:var(--ink);
+    background:var(--paper);
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit;}
+  .serif{font-family:'Fraunces', Georgia, serif;}
+  .mono{font-family:'IBM Plex Mono', monospace; letter-spacing:.02em;}
+
+  /* utility top bar */
+  .topbar{
+    background:var(--navy-900);
+    color:rgba(255,255,255,.82);
+    font-size:.82rem;
+    padding:8px 24px;
+  }
+  .topbar-inner{
+    max-width:1120px; margin:0 auto;
+    display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
+  }
+  .topbar a{ color:#fff; text-decoration:none; font-weight:600; }
+  .topbar a:hover{ text-decoration:underline; }
+  .topbar-links{ display:flex; gap:18px; flex-wrap:wrap; }
+
+  /* nav */
+  nav{
+    background:var(--navy-900);
+    padding:14px 24px 20px;
+    position:sticky; top:0; z-index:40;
+    border-bottom:1px solid rgba(255,255,255,.08);
+  }
+  .nav-inner{
+    max-width:1120px; margin:0 auto;
+    display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap;
+  }
+  .brand{ display:flex; align-items:center; gap:10px; text-decoration:none; }
+  .brand img{ width:38px; height:38px; border-radius:10px; display:block; }
+  .brand-text{ display:flex; flex-direction:column; line-height:1.2; }
+  .brand-name{ color:#fff; font-family:'Fraunces', serif; font-weight:600; font-size:1.28rem; letter-spacing:.01em; }
+  .brand-tagline{ color:rgba(255,255,255,.6); font-size:.72rem; font-weight:500; letter-spacing:.01em; }
+  .nav-links{ display:flex; gap:26px; flex-wrap:wrap; }
+  .nav-links a{ color:rgba(255,255,255,.78); text-decoration:none; font-size:.94rem; font-weight:500; }
+  .nav-links a:hover{ color:#fff; }
+  .nav-cta{
+    background:var(--capsule); color:#0c1530; font-weight:700; font-size:.92rem;
+    padding:10px 20px; border-radius:999px; text-decoration:none; white-space:nowrap;
+  }
+
+  /* hero */
+  .hero{
+    background:linear-gradient(180deg, var(--navy-900) 0%, var(--navy-800) 62%, #16226a 100%);
+    color:#fff; padding:64px 24px 90px; position:relative; overflow:hidden;
+  }
+  .hero-inner{ max-width:820px; margin:0 auto; text-align:center; position:relative; z-index:2; }
+  .eyebrow{
+    display:inline-flex; align-items:center; gap:8px;
+    font-size:.78rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
+    color:#dcd3ff; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14);
+    padding:7px 14px; border-radius:999px; margin-bottom:22px;
+  }
+  .eyebrow .dot{ width:7px; height:7px; border-radius:50%; background:var(--amber); }
+  .hero h1{
+    font-family:'Fraunces', serif; font-weight:500; font-size:clamp(2.1rem, 5vw, 3.4rem);
+    line-height:1.12; margin:0 0 20px; letter-spacing:-.01em;
+  }
+  .hero h1 em{ font-style:italic; color:#f2c766; }
+  .hero p.lead{ font-size:1.08rem; line-height:1.7; color:rgba(255,255,255,.82); max-width:620px; margin:0 auto 32px; }
+  .btn-row{ display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
+  .btn{ display:inline-flex; align-items:center; gap:8px; padding:13px 24px; border-radius:999px; font-weight:700; text-decoration:none; font-size:.96rem; }
+  .btn-primary{ background:var(--capsule); color:#0c1530; }
+  .btn-secondary{ background:rgba(255,255,255,.08); color:#fff; border:1px solid rgba(255,255,255,.28); }
+
+  /* ECG signature line */
+  .ecg-wrap{ max-width:640px; margin:44px auto 0; opacity:.85; }
+  .ecg-wrap svg{ width:100%; height:auto; display:block; }
+  .ecg-line{
+    fill:none; stroke:url(#ecgGradient); stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round;
+    stroke-dasharray:900; stroke-dashoffset:900;
+    animation:draw 3.2s ease-in-out infinite;
+  }
+  @keyframes draw{
+    0%{ stroke-dashoffset:900; }
+    55%{ stroke-dashoffset:0; }
+    100%{ stroke-dashoffset:-900; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .ecg-line{ animation:none; stroke-dashoffset:0; }
+    html{ scroll-behavior:auto; }
+  }
+
+  /* sections */
+  .wrap{ max-width:1120px; margin:0 auto; padding:0 24px; }
+  section{ padding:76px 0; }
+  .section-head{ max-width:640px; margin:0 0 40px; }
+  .section-head .kicker{
+    font-family:'IBM Plex Mono', monospace; font-size:.8rem; font-weight:600; letter-spacing:.09em;
+    text-transform:uppercase; color:var(--violet-dark); margin-bottom:10px; display:block;
+  }
+  .section-head h2{ font-family:'Fraunces', serif; font-weight:500; font-size:clamp(1.5rem, 3vw, 2.1rem); margin:0 0 10px; }
+  .section-head p{ color:var(--muted); line-height:1.65; margin:0; font-size:1.02rem; }
+
+  .capsule-rule{ width:56px; height:10px; border-radius:999px; background:var(--capsule); margin-bottom:18px; }
+
+  /* product showcase carousel */
+  .showcase{ padding-top:24px; }
+  .showcase-shell{
+    background:linear-gradient(135deg, rgba(111,79,216,0.12), rgba(242,169,27,0.12));
+    border:1px solid rgba(111,79,216,0.16); border-radius:28px; padding:28px; display:grid;
+    grid-template-columns:0.95fr 1.05fr; gap:24px; align-items:center; box-shadow:0 24px 60px rgba(12,21,64,.08);
+  }
+  .showcase-copy h2{ font-family:'Fraunces', serif; font-weight:600; font-size:clamp(1.3rem, 2.6vw, 1.9rem); margin:12px 0 10px; }
+  .showcase-copy p{ color:var(--muted); line-height:1.7; margin:0; }
+  .showcase-stage{ display:flex; flex-direction:column; gap:12px; }
+  .showcase-frame{
+    position:relative; border-radius:24px; overflow:hidden; background:var(--navy-900); color:#fff;
+    min-height:320px; box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 20px 40px rgba(12,21,64,.16);
+    padding:18px;
+    background-image:radial-gradient(circle at top left, rgba(242,169,27,0.28), transparent 32%), radial-gradient(circle at bottom right, rgba(111,79,216,0.28), transparent 34%);
+  }
+  .showcase-slide{ display:none; animation:fade .55s ease; }
+  .showcase-slide.active{ display:block; }
+  @keyframes fade{ from{ opacity:0; transform:translateY(8px) scale(.985);} to{ opacity:1; transform:translateY(0) scale(1);} }
+  .showcase-topbar{ display:flex; align-items:center; gap:8px; margin-bottom:16px; }
+  .showcase-topbar .dot-pill{ width:10px; height:10px; border-radius:50%; background:rgba(255,255,255,.45); }
+  .showcase-topbar .label{ margin-left:auto; font-size:.78rem; color:rgba(255,255,255,.75); text-transform:uppercase; letter-spacing:.08em; }
+  .mock-screen{ background:linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.06)); border:1px solid rgba(255,255,255,.14); border-radius:18px; padding:16px; display:grid; gap:12px; backdrop-filter:blur(8px); }
+  .mock-row{ display:flex; gap:10px; flex-wrap:wrap; }
+  .mini-card{ background:rgba(255,255,255,.9); color:var(--ink); border-radius:14px; padding:12px 14px; min-height:56px; flex:1; }
+  .mini-card strong{ display:block; font-size:.94rem; margin-bottom:3px; }
+  .mini-card small{ color:var(--muted); line-height:1.4; }
+  .mini-card.highlight{ background:linear-gradient(120deg, #ffffff 0%, #f0e8ff 100%); }
+  .pill{ display:inline-flex; align-items:center; gap:6px; padding:8px 12px; border-radius:999px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.16); font-size:.82rem; }
+  .showcase-content h3{ font-family:'Fraunces', serif; font-size:1.18rem; margin:0 0 8px; }
+  .showcase-content p{ color:rgba(255,255,255,.78); line-height:1.7; margin:0; font-size:.95rem; }
+  .carousel-controls{ display:flex; justify-content:space-between; align-items:center; gap:12px; }
+  .carousel-btn{ border:0; width:42px; height:42px; border-radius:50%; background:var(--card); color:var(--ink); box-shadow:0 10px 24px rgba(12,21,64,.08); cursor:pointer; font-size:1rem; }
+  .carousel-dots{ display:flex; gap:8px; }
+  .carousel-dot{ width:9px; height:9px; border-radius:50%; background:rgba(18,25,58,.2); border:0; padding:0; }
+  .carousel-dot.active{ background:var(--violet); transform:scale(1.1); }
+  @media (max-width:820px){ .showcase-shell{ grid-template-columns:1fr; } }
+
+  /* feature grid */
+  .grid{ display:grid; gap:20px; grid-template-columns:repeat(auto-fit, minmax(250px, 1fr)); }
+  .card{
+    background:var(--card); border-radius:20px; padding:28px; border:1px solid var(--line);
+    box-shadow:0 14px 36px rgba(12,21,64,.05);
+  }
+  .card h3{ font-family:'Fraunces', serif; font-weight:600; margin:0 0 8px; font-size:1.1rem; }
+  .card p{ color:var(--muted); line-height:1.65; margin:0; font-size:.96rem; }
+  .card .num{ font-family:'IBM Plex Mono', monospace; font-size:.78rem; color:var(--violet-dark); font-weight:600; display:block; margin-bottom:12px; }
+
+  /* privacy section */
+  .privacy{ background:#fff; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+  .privacy-grid{ display:grid; gap:24px; grid-template-columns:1.1fr 1fr; align-items:stretch; }
+  @media (max-width:820px){ .privacy-grid{ grid-template-columns:1fr; } }
+  .not-used{
+    background:var(--navy-900); color:#fff; border-radius:22px; padding:32px;
+  }
+  .not-used h3{ font-family:'Fraunces', serif; font-weight:600; margin:0 0 6px; font-size:1.2rem; }
+  .not-used p.sub{ color:rgba(255,255,255,.68); margin:0 0 20px; font-size:.94rem; line-height:1.6; }
+  .chip-row{ display:flex; flex-wrap:wrap; gap:10px; }
+  .chip{
+    font-family:'IBM Plex Mono', monospace; font-size:.82rem; color:rgba(255,255,255,.85);
+    background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14);
+    padding:8px 14px; border-radius:999px; position:relative; padding-left:30px;
+  }
+  .chip::before{
+    content:""; position:absolute; left:12px; top:50%; transform:translateY(-50%);
+    width:8px; height:8px; border-radius:50%; background:#ff6b6b;
+  }
+  .chip::after{
+    content:"✕"; position:absolute; left:11.5px; top:50%; transform:translateY(-50%);
+    font-size:7px; color:#0c1530; font-weight:900;
+  }
+  .used-list{ display:flex; flex-direction:column; gap:14px; }
+  .used-item{
+    background:var(--paper); border:1px solid var(--line); border-radius:16px; padding:18px 20px;
+    display:flex; gap:14px; align-items:flex-start;
+  }
+  .used-item .mark{
+    width:26px; height:14px; border-radius:999px; background:var(--capsule); flex:none; margin-top:5px;
+  }
+  .used-item h4{ margin:0 0 4px; font-family:'Fraunces', serif; font-weight:600; font-size:1rem; }
+  .used-item p{ margin:0; color:var(--muted); font-size:.92rem; line-height:1.6; }
+
+  /* legal */
+  .legal-grid{ display:grid; gap:20px; grid-template-columns:1.3fr 1fr; }
+  @media (max-width:820px){ .legal-grid{ grid-template-columns:1fr; } }
+  .legal-card{ background:var(--card); border:1px solid var(--line); border-radius:20px; padding:30px; }
+  .legal-card h3{ font-family:'Fraunces', serif; font-weight:600; margin:0 0 14px; font-size:1.2rem; }
+  .legal-card p{ color:var(--muted); line-height:1.75; font-size:.96rem; margin:0 0 12px; }
+  .legal-card p:last-child{ margin-bottom:0; }
+  .contact-card{ background:var(--navy-900); color:#fff; border-radius:20px; padding:30px; }
+  .contact-card h3{ font-family:'Fraunces', serif; font-weight:600; margin:0 0 16px; font-size:1.2rem; }
+  .contact-row{ display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+  .contact-row:last-child{ margin-bottom:0; }
+  .contact-row .icon{
+    width:34px; height:34px; border-radius:10px; background:rgba(255,255,255,.08);
+    display:flex; align-items:center; justify-content:center; flex:none; font-size:.9rem;
+  }
+  .contact-row a{ color:#fff; text-decoration:none; font-weight:600; font-size:.98rem; }
+  .contact-row a:hover{ text-decoration:underline; }
+  .contact-row .label{ display:block; font-size:.74rem; color:rgba(255,255,255,.55); text-transform:uppercase; letter-spacing:.06em; margin-bottom:2px; }
+
+  footer{ background:var(--navy-900); color:rgba(255,255,255,.6); padding:36px 24px; }
+  .footer-inner{ max-width:1120px; margin:0 auto; display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; font-size:.86rem; }
+  .footer-inner a{ color:rgba(255,255,255,.75); text-decoration:none; margin-left:18px; }
+  .footer-inner a:hover{ color:#fff; }
+
+  a:focus-visible, button:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
+
+  /* legal document / accordion */
+  .legal-doc{ background:var(--card); border:1px solid var(--line); border-radius:20px; padding:8px 30px; }
+  .legal-note{
+    font-size:.86rem; color:var(--muted); background:var(--paper); border:1px solid var(--line);
+    border-radius:14px; padding:14px 18px; margin:0 0 24px; line-height:1.6;
+  }
+  .legal-note strong{ color:var(--ink); }
+  details.legal-item{ border-bottom:1px solid var(--line); padding:22px 0; }
+  details.legal-item:last-child{ border-bottom:none; }
+  details.legal-item summary{
+    cursor:pointer; list-style:none; display:flex; align-items:center; justify-content:space-between; gap:16px;
+    font-family:'Fraunces', serif; font-weight:600; font-size:1.04rem; color:var(--ink);
+  }
+  details.legal-item summary::-webkit-details-marker{ display:none; }
+  details.legal-item summary .plus{
+    flex:none; width:26px; height:26px; border-radius:50%; background:var(--paper); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center; font-family:'IBM Plex Mono', monospace; font-size:.9rem; color:var(--violet-dark);
+    transition:transform .2s ease;
+  }
+  details.legal-item[open] summary .plus{ transform:rotate(45deg); }
+  details.legal-item .legal-body{ padding-top:14px; }
+  details.legal-item .legal-body p{ color:var(--muted); line-height:1.75; font-size:.95rem; margin:0 0 12px; }
+  details.legal-item .legal-body p:last-child{ margin-bottom:0; }
+  details.legal-item .legal-body ul{ margin:0 0 12px; padding-left:20px; color:var(--muted); font-size:.95rem; line-height:1.75; }
+  details.legal-item .legal-body ul:last-child{ margin-bottom:0; }
+  details.legal-item .legal-body li{ margin-bottom:6px; }
+  .doc-head{ display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:10px; padding:24px 0 4px; }
+  .doc-head h3{ font-family:'Fraunces', serif; font-weight:600; margin:0; font-size:1.35rem; }
+  .doc-head .updated{ font-family:'IBM Plex Mono', monospace; font-size:.78rem; color:var(--muted); }
+  .contact-strip{
+    display:grid; gap:20px; grid-template-columns:repeat(3, 1fr); margin-top:20px;
+  }
+  @media (max-width:820px){ .contact-strip{ grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="topbar-inner">
+      <span>Questions before you start tracking? We read every message.</span>
+      <div class="topbar-links">
+        <a href="https://www.tracmeds.com">www.tracmeds.com</a>
+        <a href="mailto:support@tracmeds.com">support@tracmeds.com</a>
+        <a href="#privacy-policy">Privacy Policy</a>
+        <a href="#terms">Terms of Service</a>
+      </div>
+    </div>
+  </div>
+
+  <nav>
+    <div class="nav-inner">
+      <a class="brand" href="#top">
+        <img src="icon.png" alt="TracMeds icon" />
+        <span class="brand-text">
+          <span class="brand-name">TracMeds</span>
+          <span class="brand-tagline">Your daily family health sharing app</span>
+        </span>
+      </a>
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#data-sdks">Data &amp; SDKs</a>
+        <a href="#privacy-policy">Privacy Policy</a>
+        <a href="#terms">Terms</a>
+        <a href="#refund-policy">Refund Policy</a>
+        <a href="#contact">Contact</a>
+      </div>
+      <a id="buy-link" class="nav-cta" href="download.html" rel="noreferrer">Get the app</a>
+    </div>
+  </nav>
+
+  <div style="background:#fff3cd; border-bottom:2px solid #f2a91b; color:#12193a; padding:14px 24px; text-align:center; font-size:1rem; line-height:1.5;">
+    <strong>TracMeds is a personal tracking and sharing app and website.</strong> It is not a medical device, diagnostic tool, or provider of medical advice — it simply helps you log and share medicine reminders, appointment visits, and health readings that you enter yourself.
+  </div>
+
+  <header class="hero" id="top">
+    <div class="hero-inner">
+      <span class="eyebrow"><span class="dot"></span> TracMeds — The daily family health sharing app</span>
+      <h1>Every dose, every visit,<br /><em>every reading</em> — in one place.</h1>
+      <p class="lead">TracMeds is your daily family health sharing app that keeps medicines, appointments, and health readings organised the way you'd keep them yourself — just without the loose paper, the forgotten refill, or the appointment notes you can never find again.</p>
+      <div class="btn-row">
+        <a id="hero-buy-link" class="btn btn-primary" href="download.html" rel="noreferrer">Get the app</a>
+        <a class="btn btn-secondary" href="mailto:support@tracmeds.com">Contact support</a>
+      </div>
+      <p style="margin-top: 12px; color: var(--muted); font-size: .95rem; line-height: 1.6;">Download the app first. Premium family-sharing unlocks later inside the app after purchase.</p>
+      <div class="ecg-wrap" aria-hidden="true">
+        <svg viewBox="0 0 640 90" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="ecgGradient" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#6f4fd8" />
+              <stop offset="55%" stop-color="#a98cff" />
+              <stop offset="100%" stop-color="#f2a91b" />
+            </linearGradient>
+          </defs>
+          <path class="ecg-line" d="M0,45 L110,45 L130,45 L145,15 L160,75 L175,45 L200,45 L360,45 L380,45 L395,20 L410,70 L425,45 L450,45 L640,45" />
+        </svg>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="showcase" aria-label="Product showcase carousel">
+      <div class="wrap">
+        <div class="showcase-shell">
+          <div class="showcase-copy">
+            <span class="kicker">A calm, shared view of health</span>
+            <div class="capsule-rule"></div>
+            <h2>See the day’s story in one graceful snapshot.</h2>
+            <p>TracMeds turns medicine reminders, appointments, readings, and daily reports into a simple experience that feels calm, clear, and easy to share with loved ones.</p>
+          </div>
+          <div class="showcase-stage">
+            <div class="showcase-frame">
+              <div class="showcase-slide active" data-index="0">
+                <div class="showcase-topbar">
+                  <span class="dot-pill"></span><span class="dot-pill"></span><span class="dot-pill"></span>
+                  <span class="label">Daily care</span>
+                </div>
+                <div class="mock-screen">
+                  <div class="showcase-content">
+                    <h3>Track every dose</h3>
+                    <p>One calm place for reminders, appointments, readings, and the details that matter most — all arranged in a simple daily view.</p>
+                  </div>
+                  <div class="mock-row">
+                    <div class="mini-card highlight"><strong>8:00 AM</strong><small>Medicine reminder set</small></div>
+                    <div class="mini-card"><strong>Today</strong><small>BP 128/84 logged</small></div>
+                  </div>
+                  <div class="mock-row">
+                    <span class="pill">🩺 Appointment</span>
+                    <span class="pill">💊 Dose checked</span>
+                    <span class="pill">📈 Reading saved</span>
+                  </div>
+                </div>
+              </div>
+              <div class="showcase-slide" data-index="1">
+                <div class="showcase-topbar">
+                  <span class="dot-pill"></span><span class="dot-pill"></span><span class="dot-pill"></span>
+                  <span class="label">Shared update</span>
+                </div>
+                <div class="mock-screen">
+                  <div class="showcase-content">
+                    <h3>Share a daily report</h3>
+                    <p>Share your health reports daily or at pre-set intervals with family members or caregivers, in a couple of taps.</p>
+                  </div>
+                  <div class="mock-row">
+                    <div class="mini-card highlight"><strong>Morning summary</strong><small>Medicines taken · BP stable</small></div>
+                  </div>
+                  <div class="mock-row">
+                    <span class="pill">WhatsApp ready</span>
+                    <span class="pill">Family sharing</span>
+                    <span class="pill">Support-friendly</span>
+                  </div>
+                </div>
+              </div>
+              <div class="showcase-slide" data-index="2">
+                <div class="showcase-topbar">
+                  <span class="dot-pill"></span><span class="dot-pill"></span><span class="dot-pill"></span>
+                  <span class="label">Peace of mind</span>
+                </div>
+                <div class="mock-screen">
+                  <div class="showcase-content">
+                    <h3>Keep loved ones closer</h3>
+                    <p>A calm, familiar view of the day helps families stay informed without feeling overwhelmed, while keeping the experience private and personal.</p>
+                  </div>
+                  <div class="mock-row">
+                    <div class="mini-card"><strong>Visits logged</strong><small>2 this week</small></div>
+                    <div class="mini-card"><strong>Readings chart</strong><small>4 entries tracked</small></div>
+                  </div>
+                  <div class="mock-row">
+                    <span class="pill">📅 Appointments</span>
+                    <span class="pill">🫶 Loved ones</span>
+                    <span class="pill">✨ Simple flow</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="carousel-controls">
+              <button class="carousel-btn prev" type="button" aria-label="Previous feature">←</button>
+              <div class="carousel-dots" role="tablist" aria-label="Feature slides">
+                <button class="carousel-dot active" type="button" data-dot="0" aria-label="Show first feature"></button>
+                <button class="carousel-dot" type="button" data-dot="1" aria-label="Show second feature"></button>
+                <button class="carousel-dot" type="button" data-dot="2" aria-label="Show third feature"></button>
+              </div>
+              <button class="carousel-btn next" type="button" aria-label="Next feature">→</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="features">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="kicker">What it does</span>
+          <div class="capsule-rule"></div>
+          <h2>Four habits, one app</h2>
+          <p>TracMeds doesn't try to be a hospital system. It's built around the four things people actually do by hand — reminders, visits, readings, and reports — and does each one properly.</p>
+        </div>
+        <div class="grid">
+          <article class="card">
+            <span class="num">01 — Reminders</span>
+            <h3>Medicine reminders</h3>
+            <p>Set the schedule and dosage once. TracMeds sends a reminder at the right time so nothing gets skipped or doubled up.</p>
+          </article>
+          <article class="card">
+            <span class="num">02 — Visits</span>
+            <h3>Appointment tracking</h3>
+            <p>Log doctor visits, visit tests, and visit reports against a simple timeline, so past appointments are never more than a scroll away.</p>
+          </article>
+          <article class="card">
+            <span class="num">03 — Readings</span>
+            <h3 class="mono" style="font-family:'Fraunces', serif;">Health logs</h3>
+            <p>Record blood pressure, heart rate, sugar, weight, and more, each stamped with the time and date it was taken.</p>
+          </article>
+          <article class="card">
+            <span class="num">04 — Sharing</span>
+            <h3>Daily report sharing</h3>
+            <p>Send a daily summary straight to family or caregivers over WhatsApp. This premium family-sharing feature unlocks later inside the app after purchase, and each subscription is recorded for support, renewal, and access review.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="privacy" id="data-sdks">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="kicker">Data &amp; SDKs</span>
+          <div class="capsule-rule"></div>
+          <h2>What's inside, and what isn't</h2>
+          <p>Health information deserves a plain answer about where it goes. Here is exactly what TracMeds does and does not run, on both Android and iOS.</p>
+        </div>
+        <div class="legal-note" style="margin-bottom:24px;"><strong>Your health data stays on your device.</strong> Medicines, appointments, and readings are stored locally on your phone. Nothing is uploaded to a server or database — sharing only happens when you tap "share" and choose to send it yourself.</div>
+        <div class="privacy-grid">
+          <div class="not-used">
+            <h3>Not used, on either platform</h3>
+            <p class="sub">No analytics, crash-reporting, or advertising SDKs are built into TracMeds.</p>
+            <div class="chip-row">
+              <span class="chip">Firebase</span>
+              <span class="chip">Google Analytics</span>
+              <span class="chip">Crashlytics</span>
+              <span class="chip">AdMob</span>
+              <span class="chip">Similar ad / tracking SDKs</span>
+            </div>
+          </div>
+          <div class="used-list">
+            <div class="used-item">
+              <span class="mark"></span>
+              <div>
+                <h4>Expo Notifications</h4>
+                <p>Delivers your medicine and appointment reminders at the times you set.</p>
+              </div>
+            </div>
+            <div class="used-item">
+              <span class="mark"></span>
+              <div>
+                <h4>Subscription billing service</h4>
+                <p>Handles subscription billing, so payments are managed by a dedicated, purpose-built service rather than in-house.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="privacy-policy">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="kicker">Legal · Privacy</span>
+          <div class="capsule-rule"></div>
+          <h2>Privacy Policy</h2>
+          <p>TracMeds is built so your health information stays yours — here's exactly how.</p>
+        </div>
+        <div class="legal-doc">
+          <div class="doc-head">
+            <h3>Privacy Policy</h3>
+            <span class="updated">Effective: 26 July 2026 · Version 1.0</span>
+          </div>
+          <p style="color:var(--muted); font-size:.95rem; line-height:1.75; padding-bottom:8px;">This policy explains how TracMeds ("the App") handles information when you track medicines, appointments, and health readings, and when you choose to share them. It applies to the Android and iOS apps and to www.tracmeds.com, including purchase and subscription access through Razorpay.</p>
+
+          <details class="legal-item" open>
+            <summary>Data storage — on your device only<span class="plus">+</span></summary>
+            <div class="legal-body">
+              <ul>
+                <li>All health data — medicines, appointments, health readings, and any contacts you save for sharing — is stored exclusively on your device using local on-device storage. No health data is transmitted to any server, database, or third party.</li>
+                <li>TracMeds does not collect, store, process, or have access to your personal or health information. We could not hand it over even if asked, because we never receive it.</li>
+                <li>For paid access, the app may keep only a minimal local record of the selected plan, purchase status, and purchase timestamp to support access review, support requests, renewals, and refund handling. This is separate from your health or personal data.</li>
+                <li>Contact details you save for sharing purposes remain solely on your device and are never uploaded to us.</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="legal-item">
+            <summary>What we don't run<span class="plus">+</span></summary>
+            <div class="legal-body">
+              <p>No analytics, crash-reporting, advertising identifiers, or tracking technologies are embedded in TracMeds — no Firebase, Google Analytics, Crashlytics, AdMob, or similar SDKs, on either Android or iOS.</p>
+            </div>
+          </details>
+
+          <details class="legal-item">
+            <summary>Notifications<span class="plus">+</span></summary>
+            <div class="legal-body">
+              <p>Reminder notifications are delivered through Expo's notification service, using only the minimum device token needed to send them. This is a delivery mechanism, not a data-collection tool — your medicine and appointment content is not transmitted through it.</p>
+            </div>
+          </details>
+
+          <details class="legal-item">
+            <summary>Sharing via WhatsApp<span class="plus">+</span></summary>
+            <div class="legal-body">
+              <p>Daily report sharing is entirely user-initiated. Tapping "share" opens WhatsApp on your own device with a pre-filled message, sent from your own WhatsApp account to a contact you choose. TracMeds has no visibility into, control over, or storage of any message once it's handed to WhatsApp.</p>
+              <p>WhatsApp is a separate third-party service operated by Meta Platforms, Inc., governed by its own Terms of Service and Privacy Policy. TracMeds is not affiliated with, endorsed by, or in partnership with WhatsApp or Meta.</p>
+            </div>
+          </details>
+
+          <details class="legal-item">
+            <summary>Subscriptions<span class="plus">+</span></summary>
+            <div class="legal-body">
+              <p>If you choose a paid plan, your subscription and payment are handled through Razorpay on www.tracmeds.com. Razorpay processes payments securely; TracMeds does not receive or store your payment card details. Only the minimum purchase metadata needed to verify access, support, and billing review is used.</p>
+            </div>
+          </details>
+
+          <details class="legal-item">
+            <summary>Your choices<span class="plus">+</span></summary>
+            <div class="legal-body">
+              <ul>
+                <li>Uninstalling the app permanently deletes all locally stored data, since nothing is kept anywhere else.</li>
+                <li>You can turn off notifications at any time from your device settings.</li>
+                <li>You decide exactly what to include in any message shared via WhatsApp, and to whom.</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="legal-item">
+            <summary>Children's privacy<span class="plus">+</span></summary>
+            <div class="legal-body">
+              <p>TracMeds is not directed at children. Use by a minor must be supervised by a parent or legal guardian, who accepts the Terms of Service on the minor's behalf.</p>
+            </div>
+          </details>
+
+          <details class="legal-item">
+            <summary>Changes to this policy<span class="plus">+</span></summary>
+            <div class="legal-body">
+              <p>We may update this policy as the app changes. The "Effective" date above will be updated, and continued use of TracMeds after a change means you accept the updated policy.</p>
+            </div>
+          </details>
+
+          <details class="legal-item">
+            <summary>Contact<span class="plus">+</span></summary>
+            <div class="legal-body">
+              <p>Questions about this policy can be sent to <a href="mailto:support@tracmeds.com" style="color:var(--violet-dark); font-weight:600;">support@tracmeds.com</a>.</p>
+            </div>
+          </details>
+        </div>
+        <p class="legal-note" style="margin-top:20px;"><strong>Note:</strong> this is a general template, not legal advice. It's worth a qualified lawyer's review before publishing, particularly around WhatsApp-based sharing and India's Digital Personal Data Protection Act, 2023.</p>
+      </div>
+    </section>
+
+    <section id="terms">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="kicker">Legal · Terms</span>
+          <div class="capsule-rule"></div>
+          <h2>Terms of Service</h2>
+          <p>TracMeds is a tracking and sharing tool, not a medical device or medical advice — the rules below spell that out in full.</p>
+        </div>
+        <div class="legal-doc">
+          <div class="doc-head">
+            <h3>Terms of Service</h3>
+            <span class="updated">Effective: 26 July 2026 · Version 1.0</span>
+          </div>
+
+          <details class="legal-item" open>
+            <summary>Acceptance of terms<span class="plus">+</span></summary>
+            <div class="legal-body">
+              <p>Your access to and use of TracMeds is conditioned on your acceptance of and compliance with these Terms, which apply to all users. By using TracMeds, you agree to these Terms in full. Use by a minor must be supervised by a parent or legal guardian who accepts these Terms on the minor's behalf.</p>
+            </div>
+          </details>
+
+          <details class="legal-item">
+            <summary>Not a medical device, service, or source of advice<span class="plus">+</span></summary>
+            <div class="legal-body">
+              <p><strong>TracMeds is not a medical device, medical service, or provider of medical advice. It is, solely and only, a personal medicine, appointment, and health-reading tracking and sharing tool.</strong></p>
+              <p>All content, data-entry fields, reminders, and information within the app are intended solely for personal organisational and tracking purposes. Nothing in TracMeds constitutes, replaces, or should be construed as professional medical advice, clinical diagnosis, treatment recommendation, prescription guidance, or emergency medical assistance.</p>
+              <p>Always consult a licensed, qualified healthcare professional before making any decision related to your health, medications, dosage, or treatment. In a medical emergency, contact your local emergency services immediately — do not rely on this app.</p>
+            </div>
+          </details>
+
+          <details class="legal-item">
+            <summary>No liability, under any circumstances<span class="plus">+</span></summary>
+            <div class="legal-body">
+              <p>To the maximum extent permitted by applicable law: TracMeds, its owner, its developer, its affiliates, licensors, employees, agents, contractors, and any person or entity associated with the development, distribution, or maintenance of TracMeds shall not be liable for any direct, indirect, incidental, special, consequential, exemplary, punitive, or other damages of any kind, arising out of or in any way connected with the app or its functioning — under any circumstances.</p>
+              <p>This applies regardless of the legal theory — contract, tort (including negligence), strict liability, or otherwise — even where advised of the possibility of such damages, and covers (without limitation): missed medications or dosage errors, incorrect health readings or data entry, missed or delayed medical appointments, reminders that failed to trigger, WhatsApp message delivery failures or unintended disclosures, loss of data due to device failure, uninstalling, or app error, and any other health, financial, or consequential loss.</p>
+              <p>TracMeds is provided "as is" and "as available," without warranties of any kind, express or implied, including implied warranties of merchantability, fitness for a particular purpose, accuracy, reliability, or non-infringement. The app's owner and developer do not warrant that the app will be uninterrupted, error-free, secure, or free of harmful components.</p>
+            </div>
+          </details>
+
+          <details class="legal-item">
+            <summary>You take full responsibility<span class="plus">+</span></summary>
+            <div class="legal-body">
+              <p>You are solely and fully responsible for:</p>
+              <ul>
+                <li>The accuracy and completeness of all health data, medication details, dosages, and appointment information you enter.</li>
+                <li>Verifying all medication names, dosages, schedules, and reminders with a licensed healthcare provider before acting on them.</li>
+                <li>Using WhatsApp sharing only with contacts who have consented to receive health-related messages from you.</li>
+                <li>Complying with applicable local laws regarding health-information sharing.</li>
+                <li>The security of the device the app is installed on.</li>
+                <li>Not relying on TracMeds as your sole system for critical medication management, without professional oversight.</li>
+              </ul>
+              <p>Any legal, regulatory, civil, criminal, administrative, or other consequence arising from your use or misuse of TracMeds is yours alone. The app's owner, developer, affiliates, and anyone related to TracMeds are expressly waived and released from any liability, responsibility, or obligation in connection with any claim, complaint, investigation, or enforcement action arising from your use of the app.</p>
+            </div>
+          </details>
+
+          <details class="legal-item">
+            <summary>Indemnification<span class="plus">+</span></summary>
+            <div class="legal-body">
+              <p>You agree to indemnify, defend, and hold harmless the app's owner and developer, their affiliates, agents, employees, and contractors from any claims, liabilities, damages, losses, costs, or fees (including reasonable legal fees) arising from your use of TracMeds, your violation of these Terms, your violation of any third party's rights, or any data you enter, share, or transmit through the app.</p>
+            </div>
+          </details>
+
+          <details class="legal-item">
+            <summary>Prohibited uses<span class="plus">+</span></summary>
+            <div class="legal-body">
+              <p>You agree not to:</p>
+              <ul>
+                <li>Use TracMeds for any unlawful, unfair, anti-security, or otherwise prohibited purpose, under any local, national, or international law.</li>
+                <li>Reverse-engineer, decompile, or attempt to extract the app's source code.</li>
+                <li>Use the app to send unsolicited messages or spam via WhatsApp.</li>
+                <li>Impersonate any person or misrepresent your affiliation with any entity.</li>
+                <li>Use the app for commercial purposes without written permission from the owner.</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="legal-item">
+            <summary>Subscriptions &amp; payments<span class="plus">+</span></summary>
+            <div class="legal-body">
+              <p>Paid features are billed and managed through Razorpay on www.tracmeds.com. Billing, renewal, and cancellation follow Razorpay's policies — manage or cancel subscriptions through Razorpay's customer portal or the payment confirmation emails. TracMeds does not receive or store your payment card details, and basic subscription records may be kept locally in the app to support access review, support requests, and refund handling.</p>
+            </div>
+          </details>
+
+          <details class="legal-item">
+            <summary>Intellectual property<span class="plus">+</span></summary>
+            <div class="legal-body">
+              <p>TracMeds and all its content, features, branding, icons, and functionality are owned by the app's owner and developer, and are protected by applicable intellectual property laws. You're granted a limited, non-exclusive, non-transferable, revocable licence to use the app for personal, non-commercial health-tracking purposes only.</p>
+            </div>
+          </details>
+
+          <details class="legal-item">
+            <summary>Termination<span class="plus">+</span></summary>
+            <div class="legal-body">
+              <p>You may stop using TracMeds at any time by uninstalling it. Since all data is stored locally on your device, uninstalling permanently deletes it. The app's owner reserves the right to discontinue the app at any time.</p>
+            </div>
+          </details>
+
+          <details class="legal-item">
+            <summary>Governing law &amp; disputes<span class="plus">+</span></summary>
+            <div class="legal-body">
+              <p>These Terms are governed by the laws of India, without regard to conflict-of-law principles. Disputes will first be attempted to be resolved through good-faith negotiation; if unresolved, they will be submitted to binding arbitration before a mutually agreed arbitrator, with each party bearing its own costs.</p>
+            </div>
+          </details>
+
+          <details class="legal-item">
+            <summary>Changes to these terms<span class="plus">+</span></summary>
+            <div class="legal-body">
+              <p>These Terms may be updated at any time; updated Terms are presented within the app on next launch. Continued use of TracMeds after a change constitutes acceptance of the revised Terms.</p>
+            </div>
+          </details>
+
+          <details class="legal-item">
+            <summary>Severability &amp; entire agreement<span class="plus">+</span></summary>
+            <div class="legal-body">
+              <p>If any provision of these Terms is found unenforceable, it will be limited or eliminated to the minimum extent necessary, and the remaining provisions continue in full force. These Terms, together with the Privacy Policy, form the entire agreement between you and the app's owner regarding TracMeds.</p>
+            </div>
+          </details>
+
+          <details class="legal-item">
+            <summary>Contact<span class="plus">+</span></summary>
+            <div class="legal-body">
+              <p>Questions about these Terms can be sent to <a href="mailto:support@tracmeds.com" style="color:var(--violet-dark); font-weight:600;">support@tracmeds.com</a>.</p>
+            </div>
+          </details>
+        </div>
+        <p class="legal-note" style="margin-top:20px;"><strong>Note:</strong> this is a general template, not legal advice. Blanket liability waivers are enforced only to the extent local law allows — it's worth a qualified lawyer's review of the liability, indemnification, and arbitration clauses before you publish.</p>
+      </div>
+    </section>
+
+    <section id="refund-policy">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="kicker">Legal · Refunds</span>
+          <div class="capsule-rule"></div>
+          <h2>Refund Policy</h2>
+          <p>Digital app purchases are final once access is granted, but we review refund requests fairly when there is a genuine issue.</p>
+        </div>
+        <div class="legal-doc">
+          <div class="doc-head">
+            <h3>Refund Policy</h3>
+            <span class="updated">Effective: 31 July 2026 · Version 1.0</span>
+          </div>
+          <p style="color:var(--muted); font-size:.95rem; line-height:1.75; padding-bottom:8px;">Refunds are considered only for payments made in error, duplicate charges, or where the app is not usable due to a confirmed technical issue on our side.</p>
+          <ul style="margin:0 0 12px; padding-left:20px; color:var(--muted); font-size:.95rem; line-height:1.75;">
+            <li>If you believe you were charged twice, or if the payment was made by mistake, contact us within 7 days and we will review the request.</li>
+            <li>If the app fails due to a verified bug or technical issue that prevents basic use, we may offer a refund or credit after review.</li>
+            <li>Refunds are generally not available for change-of-mind purchases, partial use of the app, or subscription renewals that have already been processed.</li>
+            <li>Subscriptions that are already active may be cancelled at any time, but cancellation does not guarantee a refund for the current billing period.</li>
+          </ul>
+          <p style="color:var(--muted); font-size:.95rem; line-height:1.75; margin:0;">To request a refund, email <a href="mailto:support@tracmeds.com" style="color:var(--violet-dark); font-weight:600;">support@tracmeds.com</a> with your order reference, payment date, and a brief explanation. We will review the request and respond within a reasonable timeframe.</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="contact-strip" id="contact">
+          <div class="contact-card">
+            <h3>Support &amp; contact</h3>
+            <div class="contact-row">
+              <span class="icon">🌐</span>
+              <div>
+                <span class="label">Website</span>
+                <a href="https://www.tracmeds.com" target="_blank" rel="noreferrer">www.tracmeds.com</a>
+              </div>
+            </div>
+            <div class="contact-row">
+              <span class="icon">✉️</span>
+              <div>
+                <span class="label">Email</span>
+                <a href="mailto:support@tracmeds.com">support@tracmeds.com</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+      <span>© 2026 TracMeds. All rights reserved.</span>
+      <nav>
+        <a href="#privacy-policy">Privacy Policy</a>
+        <a href="#terms">Terms</a>
+        <a href="#refund-policy">Refund Policy</a>
+        <a href="mailto:support@tracmeds.com">support@tracmeds.com</a>
+        <a href="https://www.tracmeds.com">www.tracmeds.com</a>
+      </nav>
+    </div>
+    <div class="footer-inner" style="margin-top:14px; font-size:.85rem; color:rgba(255,255,255,.65);">
+      <span>TracMeds is owned and operated by: Anurag Sinha, 2G 505, Indiabulls Greens, Lavender, Sector-2, Kon, Raigad, Maharashtra - 410221 · GSTIN: 27BIQPS9199K1ZW</span>
+    </div>
+  </footer>
+
+    <script>
+      (function() {
+        var buyButtons = [document.getElementById('buy-link'), document.getElementById('hero-buy-link')];
+        buyButtons.forEach(function(button) {
+          if (!button) return;
+          button.addEventListener('click', function(event) {
+            event.preventDefault();
+            window.location.href = 'download.html';
+          });
+        });
+
+        var slides = Array.from(document.querySelectorAll('.showcase-slide'));
+        var dots = Array.from(document.querySelectorAll('.carousel-dot'));
+        var prevBtn = document.querySelector('.carousel-btn.prev');
+        var nextBtn = document.querySelector('.carousel-btn.next');
+        var currentIndex = 0;
+        var timer;
+
+        function showSlide(index) {
+          if (!slides.length) return;
+          currentIndex = (index + slides.length) % slides.length;
+          slides.forEach(function(slide, slideIndex) {
+            slide.classList.toggle('active', slideIndex === currentIndex);
+          });
+          dots.forEach(function(dot, dotIndex) {
+            dot.classList.toggle('active', dotIndex === currentIndex);
+          });
+        }
+
+        function startAutoPlay() {
+          clearInterval(timer);
+          timer = setInterval(function() {
+            showSlide(currentIndex + 1);
+          }, 5000);
+        }
+
+        if (prevBtn) {
+          prevBtn.addEventListener('click', function() {
+            showSlide(currentIndex - 1);
+            startAutoPlay();
+          });
+        }
+
+        if (nextBtn) {
+          nextBtn.addEventListener('click', function() {
+            showSlide(currentIndex + 1);
+            startAutoPlay();
+          });
+        }
+
+        dots.forEach(function(dot) {
+          dot.addEventListener('click', function() {
+            showSlide(Number(dot.getAttribute('data-dot')));
+            startAutoPlay();
+          });
+        });
+
+        var frame = document.querySelector('.showcase-frame');
+        if (frame) {
+          frame.addEventListener('mouseenter', function() {
+            clearInterval(timer);
+          });
+          frame.addEventListener('mouseleave', startAutoPlay);
+        }
+
+        showSlide(0);
+        startAutoPlay();
+      })();
+    </script>
+
