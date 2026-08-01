@@ -836,7 +836,7 @@
       });
 
       // Razorpay integration config
-      const SERVER_BASE = window.SERVER_BASE || window.location.origin;
+      const SERVER_BASE = window.SERVER_BASE || 'https://website-tracmeds-backend-on-render.onrender.com';
       const RAZORPAY_KEY_ID = new URLSearchParams(window.location.search).get('key_id') || 'rzp_test_TKWBLW1cnaVy4f';
 
       // Load Razorpay checkout script dynamically
