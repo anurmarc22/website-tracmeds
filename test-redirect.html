@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>TracMeds - Test Deep Link Redirect</title>
+  <style>body{display:grid;place-items:center;height:100vh;font-family:Inter,Arial;}</style>
+</head>
+<body>
+  <div>
+    <h2>Test redirect to app (simulated success)</h2>
+    <p>This page will redirect to the app deep-link with simulated Razorpay params in 2s.</p>
+    <p>If nothing happens, tap the button below.</p>
+    <p><a id="manual" href="#">Open deep link manually</a></p>
+  </div>
+  <script>
+    // Simulated values (order/payment/signature were generated during local simulation)
+    const paymentId = 'pay_sim_67890';
+    const orderId = 'order_sim_12345';
+    const signature = 'a4f72c426e60401cb946c0a72d79219856c9734d7d1e03948a64b972bde3b049';
+    const url = `tracmeds://payment/complete?status=success&razorpay_payment_id=${paymentId}&razorpay_order_id=${orderId}&razorpay_signature=${signature}`;
+    document.getElementById('manual').href = url;
+    setTimeout(()=>{ window.location.href = url; }, 2000);
+  </script>
+</body>
+</html>
