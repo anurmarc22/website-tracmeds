@@ -1,0 +1,17 @@
+{
+  "name": "TracMeds",
+  "short_name": "TracMeds",
+  "description": "TracMeds — daily family health sharing for desktop, tablet, and mobile.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f2f4fb",
+  "theme_color": "#6f4fd8",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "scope": "/"
+}
