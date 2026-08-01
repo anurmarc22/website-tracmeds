@@ -836,8 +836,8 @@
       });
 
       // Razorpay integration config
-      const SERVER_BASE = window.SERVER_BASE || 'https://www.tracmeds.com';
-      const RAZORPAY_KEY_ID = new URLSearchParams(window.location.search).get('key_id') || 'YOUR_RAZORPAY_KEY_ID';
+      const SERVER_BASE = window.SERVER_BASE || window.location.origin;
+      const RAZORPAY_KEY_ID = new URLSearchParams(window.location.search).get('key_id') || 'rzp_test_TKWBLW1cnaVy4f';
 
       // Load Razorpay checkout script dynamically
       (function loadRazor(){
@@ -849,11 +849,13 @@
         document.head.appendChild(s);
       })();
 
-      // Read params: plan, return_url, cancel_url
+      // Read params: plan, return_url, cancel_url, order_api_url, verify_api_url
       const params = new URLSearchParams(window.location.search);
       const plan = (params.get('plan') || 'monthly').toLowerCase();
       const returnUrl = params.get('return_url') || 'tracmeds://payment/complete';
       const cancelUrl = params.get('cancel_url') || 'tracmeds://payment/cancel';
+      const orderApiUrl = params.get('order_api_url') || `${SERVER_BASE.replace(/\/$/, '')}/api/checkout/create-order`;
+      const verifyApiUrl = params.get('verify_api_url') || `${SERVER_BASE.replace(/\/$/, '')}/api/checkout/verify-payment`;
 
       // Map plan to amount in paise
       const PLAN_AMOUNTS = {
@@ -862,18 +864,63 @@
       };
       const AMOUNT = PLAN_AMOUNTS[plan] || PLAN_AMOUNTS.monthly;
 
-      function startCheckout() {
-        if (window.Razorpay) {
+      async function startCheckout() {
+        try {
+          const orderResponse = await fetch(orderApiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              plan,
+              amount: AMOUNT,
+              currency: 'INR',
+              receipt: `tracmeds-${Date.now()}`,
+              notes: {
+                returnUrl,
+                cancelUrl
+              }
+            })
+          });
+
+          const orderData = await orderResponse.json();
+          if (!orderResponse.ok || !orderData.order_id) {
+            throw new Error(orderData.error || 'Unable to create a Razorpay order.');
+          }
+
+          if (!window.Razorpay) {
+            throw new Error('Razorpay checkout script is still loading. Please try again.');
+          }
+
           const options = {
-            key: RAZORPAY_KEY_ID,
-            amount: AMOUNT,
-            currency: 'INR',
+            key: orderData.key_id || RAZORPAY_KEY_ID,
+            amount: orderData.amount || AMOUNT,
+            currency: orderData.currency || 'INR',
             name: 'TracMeds',
             description: `${plan === 'annual' ? 'Annual' : 'Monthly'} family sharing access`,
-            order_id: `order_${Date.now()}`,
-            handler: function(response) {
-              const paymentUrl = `${returnUrl}?status=success&razorpay_payment_id=${encodeURIComponent(response.razorpay_payment_id || '')}&razorpay_order_id=${encodeURIComponent(response.razorpay_order_id || '')}`;
-              window.location.href = paymentUrl;
+            order_id: orderData.order_id,
+            handler: async function(response) {
+              try {
+                const verifyResponse = await fetch(verifyApiUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    order_id: response.razorpay_order_id,
+                    payment_id: response.razorpay_payment_id,
+                    signature: response.razorpay_signature,
+                    plan,
+                    returnUrl,
+                    cancelUrl
+                  })
+                });
+                const verifyData = await verifyResponse.json();
+                if (!verifyResponse.ok || !verifyData.success) {
+                  throw new Error(verifyData.error || 'Payment verification failed.');
+                }
+
+                const paymentUrl = `${returnUrl}?status=success&razorpay_payment_id=${encodeURIComponent(response.razorpay_payment_id || '')}&razorpay_order_id=${encodeURIComponent(response.razorpay_order_id || '')}&razorpay_signature=${encodeURIComponent(response.razorpay_signature || '')}`;
+                window.location.href = paymentUrl;
+              } catch (error) {
+                window.location.href = `${cancelUrl}?error=${encodeURIComponent(error.message || 'Payment verification failed')}`;
+              }
             },
             modal: {
               ondismiss: function() {
@@ -890,10 +937,9 @@
 
           const razorpay = new window.Razorpay(options);
           razorpay.open();
-          return;
+        } catch (error) {
+          window.alert(error.message || 'Unable to start checkout.');
         }
-
-        window.location.href = `${SERVER_BASE}/download.html?plan=${plan}&return_url=${encodeURIComponent(returnUrl)}&cancel_url=${encodeURIComponent(cancelUrl)}`;
       }
 
       (function() {
