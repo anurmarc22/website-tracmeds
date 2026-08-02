@@ -20,7 +20,7 @@ const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
 const GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
   ? process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY.replace(/\\n/g, '\n')
   : undefined;
-const GOOGLE_SHEET_RANGE = process.env.GOOGLE_SHEET_RANGE || 'Sheet1!A1:Z1';
+const GOOGLE_SHEET_RANGE = process.env.GOOGLE_SHEET_RANGE || 'Sheet1!A1:AA1';
 
 if (GOOGLE_SHEET_ID && GOOGLE_SERVICE_ACCOUNT_EMAIL && GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) {
   console.log('Google Sheets bookkeeping enabled.');
@@ -127,7 +127,7 @@ function getSheetsClient() {
 
 async function ensureSheetHeaderRow(sheets) {
   const sheetName = GOOGLE_SHEET_RANGE.split('!')[0] || 'Sheet1';
-  const headerRange = `${sheetName}!A1:Z1`;
+  const headerRange = `${sheetName}!A1:AA1`;
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: GOOGLE_SHEET_ID,
     range: headerRange,
