@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#6f4fd8" />
+  <title>Complete your purchase — TracMeds</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #12193a;
+      --navy-900: #0c1530;
+      --violet: #6f4fd8;
+      --amber: #f2a91b;
+      --paper: #f2f4fb;
+      --card: #ffffff;
+      --muted: #5c6785;
+      --line: rgba(18, 25, 58, 0.09);
+      --capsule: linear-gradient(100deg, var(--violet) 0%, var(--violet) 48%, var(--amber) 52%, var(--amber) 100%);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Inter', Arial, sans-serif;
+      background: linear-gradient(180deg, #f7f8fd 0%, var(--paper) 100%);
+      color: var(--ink);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .card {
+      width: min(440px, 100%);
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      box-shadow: 0 20px 60px rgba(12, 21, 64, 0.12);
+      padding: 36px;
+      text-align: center;
+    }
+    .logo-row {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 22px;
+      text-decoration: none;
+    }
+    .logo-row img { width: 44px; height: 44px; border-radius: 12px; }
+    .logo-row span {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    h1 {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin: 0 0 8px;
+    }
+    p.sub { color: var(--muted); line-height: 1.6; margin: 0 0 24px; font-size: 0.96rem; }
+    .plan-toggle {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .plan-option {
+      flex: 1;
+      background: var(--paper);
+      border: 2px solid var(--line);
+      border-radius: 14px;
+      padding: 14px 12px;
+      cursor: pointer;
+      text-align: left;
+    }
+    .plan-option.selected {
+      border-color: var(--violet);
+      background: #f4f0ff;
+    }
+    .plan-option .label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+    .plan-option .price { font-family: 'Fraunces', Georgia, serif; font-size: 1.25rem; font-weight: 600; color: var(--ink); margin-top: 2px; }
+    .plan-option .price span { font-size: 0.82rem; color: var(--muted); font-weight: 500; }
+    .plan-box {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .form-card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 18px;
+      margin-bottom: 20px;
+      text-align: left;
+    }
+    .form-card h2 {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: 1rem;
+      margin: 0 0 8px;
+    }
+    .form-grid {
+      display: grid;
+      gap: 12px;
+    }
+    .field label {
+      display: block;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .field input, .field select, .field textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font: inherit;
+      color: var(--ink);
+      background: #fff;
+    }
+    .field textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 0 2px;
+      font-size: 0.95rem;
+    }
+    .toggle-row input {
+      width: 16px;
+      height: 16px;
+    }
+    .hint {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+    .plan-name { font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
+    .plan-price { font-family: 'Fraunces', Georgia, serif; font-size: 2rem; font-weight: 600; color: var(--ink); }
+    .plan-price span { font-size: 1rem; color: var(--muted); font-weight: 500; }
+    .plan-summary { font-size: 0.9rem; color: var(--muted); line-height: 1.5; margin-top: 8px; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 14px 20px;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 1rem;
+      background: var(--capsule);
+      color: #0c1530;
+    }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .status { margin-top: 16px; font-size: 0.9rem; color: var(--muted); min-height: 20px; }
+    .status.error { color: #c0392b; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <a href="/index.html" class="logo-row">
+      <img src="/icon.png" alt="TracMeds" />
+      <span>TracMeds</span>
+    </a>
+    <h1>Complete your purchase</h1>
+    <p class="sub">You're unlocking premium family-sharing access.</p>
+
+    <div class="plan-toggle">
+      <div class="plan-option" id="option-monthly" data-plan="monthly">
+        <div class="label">Monthly</div>
+        <div class="price">₹149<span>/mo</span></div>
+      </div>
+      <div class="plan-option" id="option-annual" data-plan="annual">
+        <div class="label">Annual</div>
+        <div class="price">₹1299<span>/yr</span></div>
+      </div>
+    </div>
+
+    <div class="plan-box">
+      <div class="plan-name" id="plan-name">Monthly plan</div>
+      <div class="plan-price" id="plan-price">₹149<span>/month</span></div>
+      <div class="plan-summary" id="plan-summary">Customer pays ₹149.00 incl. GST and payment processing charges. Estimated payout to you: ₹145.48.</div>
+    </div>
+
+    <div class="form-card">
+      <h2>Invoice details</h2>
+      <div class="form-grid">
+        <div class="field">
+          <label for="customer-name">Name</label>
+          <input id="customer-name" name="customer-name" type="text" autocomplete="name" placeholder="Your full name" />
+        </div>
+        <div class="field">
+          <label for="customer-phone">Phone number</label>
+          <input id="customer-phone" name="customer-phone" type="tel" autocomplete="tel" placeholder="10-digit phone" />
+        </div>
+        <div class="field">
+          <label for="customer-email">Email</label>
+          <input id="customer-email" name="customer-email" type="email" autocomplete="email" placeholder="you@example.com" />
+        </div>
+        <div class="field">
+          <label for="customer-address">Billing address</label>
+          <textarea id="customer-address" name="customer-address" placeholder="Street, city, state, PIN code"></textarea>
+        </div>
+        <div class="field">
+          <label for="customer-state">Place of supply (State or Outside India)</label>
+          <input id="customer-state" name="customer-state" type="text" placeholder="Maharashtra or Outside India" />
+        </div>
+        <div class="toggle-row">
+          <label for="gst-required">I need a GST invoice</label>
+          <input id="gst-required" name="gst-required" type="checkbox" />
+        </div>
+        <div class="field" id="gstin-field" style="display:none;">
+          <label for="customer-gstin">GSTIN</label>
+          <input id="customer-gstin" name="customer-gstin" type="text" placeholder="22AAAAA0000A1Z5" />
+        </div>
+      </div>
+      <div class="hint">If you request a GST invoice, we will use these details to issue it and keep the transaction record for bookkeeping and compliance.</div>
+    </div>
+
+    <button id="pay-button" class="btn" type="button">Pay now</button>
+    <div class="status" id="status"></div>
+  </main>
+
+  <main class="card" id="success-card" style="display:none;">
+    <div style="font-size:2.5rem; margin-bottom:8px;">✅</div>
+    <h1>Payment successful</h1>
+    <p class="sub">Your payment went through. If you started this from the TracMeds app on your phone, you can now return to it — your plan will be active there.</p>
+    <p class="sub" style="margin-top:16px; font-size:0.88rem;">If nothing happens automatically, just open the TracMeds app on the same phone to see your unlocked plan.</p>
+  </main>
+
+  <script>
+    const SERVER_BASE = 'https://website-tracmeds-backend-on-render.onrender.com';
+    const RAZORPAY_KEY_ID = 'rzp_test_TKnYyH9nXpdyV2';
+
+    const PLAN_DETAILS = {
+      monthly: { amount: 14900, label: 'Monthly plan', priceHtml: '₹149<span>/month</span>' },
+      annual:  { amount: 129900, label: 'Annual plan', priceHtml: '₹1299<span>/year</span>' }
+    };
+
+    (function loadRazorpayScript() {
+      const s = document.createElement('script');
+      s.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      s.async = true;
+      document.head.appendChild(s);
+    })();
+
+    const params = new URLSearchParams(window.location.search);
+    let plan = (params.get('plan') || 'monthly').toLowerCase();
+    if (!PLAN_DETAILS[plan]) plan = 'monthly';
+    const returnUrl = params.get('return_url') || 'tracmeds://payment/complete';
+    const cancelUrl = params.get('cancel_url') || 'tracmeds://payment/cancel';
+
+    const optionMonthly = document.getElementById('option-monthly');
+    const optionAnnual = document.getElementById('option-annual');
+    const planNameEl = document.getElementById('plan-name');
+    const planPriceEl = document.getElementById('plan-price');
+
+    function estimatePayout(amountInPaise) {
+      const grossAmount = amountInPaise / 100;
+      const feeBeforeGst = grossAmount * 0.02;
+      const fee = feeBeforeGst + (feeBeforeGst * 0.18);
+      const netPayout = grossAmount - fee;
+      return { grossAmount, fee, netPayout };
+    }
+
+    function selectPlan(newPlan) {
+      plan = newPlan;
+      const info = PLAN_DETAILS[plan];
+      const payout = estimatePayout(info.amount);
+      planNameEl.textContent = info.label;
+      planPriceEl.innerHTML = info.priceHtml;
+      document.getElementById('plan-summary').innerHTML = `Customer pays ₹${payout.grossAmount.toFixed(2)} incl. GST and payment processing charges. Estimated payout to you: ₹${payout.netPayout.toFixed(2)}.`;
+      optionMonthly.classList.toggle('selected', plan === 'monthly');
+      optionAnnual.classList.toggle('selected', plan === 'annual');
+    }
+
+    optionMonthly.addEventListener('click', function () { selectPlan('monthly'); });
+    optionAnnual.addEventListener('click', function () { selectPlan('annual'); });
+    selectPlan(plan);
+
+    // Handle return from the backend's redirect-flow callback (used by Safari and some browsers)
+    const callbackStatus = params.get('callback_status');
+    if (callbackStatus === 'success') {
+      document.querySelector('.card').style.display = 'none';
+      document.getElementById('success-card').style.display = 'block';
+      window.location.href = returnUrl + (returnUrl.includes('?') ? '&' : '?') + 'status=success';
+    } else if (callbackStatus === 'failed') {
+      setStatus('Payment could not be verified. Please contact support if you were charged.', true);
+      window.location.href = cancelUrl + (cancelUrl.includes('?') ? '&' : '?') + 'status=failed';
+    }
+
+    const payButton = document.getElementById('pay-button');
+    const statusEl = document.getElementById('status');
+    const customerNameEl = document.getElementById('customer-name');
+    const customerPhoneEl = document.getElementById('customer-phone');
+    const customerEmailEl = document.getElementById('customer-email');
+    const customerAddressEl = document.getElementById('customer-address');
+    const customerStateEl = document.getElementById('customer-state');
+    const gstRequiredEl = document.getElementById('gst-required');
+    const gstinFieldEl = document.getElementById('gstin-field');
+    const customerGstinEl = document.getElementById('customer-gstin');
+
+    gstRequiredEl.addEventListener('change', function () {
+      gstinFieldEl.style.display = gstRequiredEl.checked ? 'block' : 'none';
+    });
+
+    function setStatus(message, isError) {
+      statusEl.textContent = message || '';
+      statusEl.classList.toggle('error', Boolean(isError));
+    }
+
+    function showSuccessScreen() {
+      document.querySelector('.card').style.display = 'none';
+      document.getElementById('success-card').style.display = 'block';
+    }
+
+    payButton.addEventListener('click', async function () {
+      payButton.disabled = true;
+      payButton.textContent = 'Opening secure checkout…';
+      setStatus('');
+
+      try {
+        const planInfo = PLAN_DETAILS[plan];
+        const orderRes = await fetch(SERVER_BASE + '/api/create-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: planInfo.amount,
+            currency: 'INR',
+            receipt: 'tracmeds_' + plan + '_' + Date.now(),
+            notes: {
+              name: customerNameEl.value,
+              phone: customerPhoneEl.value,
+              email: customerEmailEl.value,
+              place_of_supply: customerStateEl.value,
+              gst_required: gstRequiredEl.checked ? 'yes' : 'no',
+              gstin: customerGstinEl.value,
+              plan
+            }
+          })
+        });
+
+        if (!orderRes.ok) throw new Error('Unable to start checkout. Please try again.');
+        const order = await orderRes.json();
+
+        if (!window.Razorpay) throw new Error('Payment page is still loading. Please try again in a moment.');
+
+        const options = {
+          key: RAZORPAY_KEY_ID,
+          amount: order.amount,
+          currency: order.currency,
+          name: 'TracMeds',
+          description: planInfo.label + ' — family sharing access',
+          order_id: order.order_id,
+          callback_url: SERVER_BASE + '/api/payment-callback?return_url=' + encodeURIComponent(returnUrl) + '&cancel_url=' + encodeURIComponent(cancelUrl),
+          redirect: true,
+          handler: async function (response) {
+            try {
+              const verifyRes = await fetch(SERVER_BASE + '/api/verify-payment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  ...response,
+                  notes: {
+                    name: customerNameEl.value,
+                    phone: customerPhoneEl.value,
+                    email: customerEmailEl.value,
+                    address: customerAddressEl.value,
+                    place_of_supply: document.getElementById('customer-state').value,
+                    gst_required: gstRequiredEl.checked ? 'yes' : 'no',
+                    gstin: customerGstinEl.value,
+                    plan,
+                    amount: planInfo.amount,
+                    currency: 'INR',
+                    receipt: 'tracmeds_' + plan + '_' + Date.now()
+                  }
+                })
+              });
+              const verifyData = await verifyRes.json();
+              if (verifyRes.ok && verifyData.success) {
+                showSuccessScreen();
+                window.location.href = returnUrl + (returnUrl.includes('?') ? '&' : '?') + 'status=success';
+              } else {
+                setStatus('Payment verification failed. Please contact support if you were charged.', true);
+                window.location.href = cancelUrl + (cancelUrl.includes('?') ? '&' : '?') + 'status=failed';
+              }
+            } catch (err) {
+              setStatus('Payment verification failed. Please contact support if you were charged.', true);
+              window.location.href = cancelUrl + (cancelUrl.includes('?') ? '&' : '?') + 'status=failed';
+            }
+          },
+          modal: {
+            ondismiss: function () {
+              window.location.href = cancelUrl + (cancelUrl.includes('?') ? '&' : '?') + 'status=cancel';
+            }
+          },
+          theme: { color: '#6f4fd8' }
+        };
+
+        const rzp = new window.Razorpay(options);
+        rzp.on('payment.failed', function (resp) {
+          setStatus('Payment failed: ' + ((resp.error && resp.error.description) || 'please try again.'), true);
+        });
+        rzp.open();
+      } catch (err) {
+        setStatus(err.message || 'Something went wrong. Please try again.', true);
+      } finally {
+        payButton.disabled = false;
+        payButton.textContent = 'Pay now';
+      }
+    });
+  </script>
+</body>
+</html>
