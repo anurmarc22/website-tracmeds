@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
 const app = express();
 app.use(cors());
@@ -24,13 +24,7 @@ const razor = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 function getLedgerPath() {
   return process.env.LEDGER_FILE_PATH || path.join(__dirname, 'ledger.json');
@@ -295,21 +289,35 @@ function buildInvoiceEmailHtml(invoice) {
 }
 
 async function sendInvoiceEmail(invoice) {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.warn('Email credentials not configured; skipping invoice email send.');
-    return { success: false, reason: 'missing_email_credentials' };
+  if (!resend) {
+    console.warn('RESEND_API_KEY not configured; skipping invoice email send.');
+    return { success: false, reason: 'missing_resend_api_key' };
+  }
+  if (!invoice.customerEmail) {
+    console.warn('No customer email provided; skipping invoice email send.');
+    return { success: false, reason: 'missing_customer_email' };
   }
 
   const html = buildInvoiceEmailHtml(invoice);
 
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
-    to: invoice.customerEmail,
-    subject: `TracMeds Invoice ${invoice.invoiceNumber}`,
-    html,
-  });
+  try {
+    const result = await resend.emails.send({
+      from: process.env.EMAIL_FROM || 'TracMeds <invoices@tracmeds.com>',
+      to: invoice.customerEmail,
+      subject: `TracMeds Invoice ${invoice.invoiceNumber}`,
+      html,
+    });
 
-  return { success: true };
+    if (result.error) {
+      console.error('Resend API returned an error sending invoice email', result.error);
+      return { success: false, reason: 'resend_api_error', error: result.error };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error sending invoice email via Resend', error);
+    return { success: false, reason: 'send_exception', error: error.message };
+  }
 }
 
 app.post('/api/create-order', async (req, res) => {
