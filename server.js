@@ -8,6 +8,7 @@ const bodyParser = require('body-parser');
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
 const PORT = process.env.PORT || 3001;
 
@@ -59,6 +60,27 @@ app.post('/api/verify-payment', (req, res) => {
     return res.json({ success: true });
   }
   return res.status(400).json({ success: false, error: 'Signature mismatch' });
+});
+
+app.post('/api/payment-callback', (req, res) => {
+  const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = req.body;
+  const returnUrl = req.query.return_url || 'tracmeds://payment/complete';
+  const cancelUrl = req.query.cancel_url || 'tracmeds://payment/cancel';
+  const checkoutPageUrl = 'https://www.tracmeds.com/razorpay/';
+
+  if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature) {
+    return res.redirect(302, checkoutPageUrl + '?callback_status=failed&return_url=' + encodeURIComponent(returnUrl) + '&cancel_url=' + encodeURIComponent(cancelUrl));
+  }
+
+  const generated_signature = crypto
+    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || '')
+    .update(razorpay_order_id + '|' + razorpay_payment_id)
+    .digest('hex');
+
+  if (generated_signature === razorpay_signature) {
+    return res.redirect(302, checkoutPageUrl + '?callback_status=success&return_url=' + encodeURIComponent(returnUrl) + '&cancel_url=' + encodeURIComponent(cancelUrl));
+  }
+  return res.redirect(302, checkoutPageUrl + '?callback_status=failed&return_url=' + encodeURIComponent(returnUrl) + '&cancel_url=' + encodeURIComponent(cancelUrl));
 });
 
 app.listen(PORT, () => console.log(`Razorpay server listening on port ${PORT}`));
