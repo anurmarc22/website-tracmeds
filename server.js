@@ -7,6 +7,7 @@ const path = require('path');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const { Resend } = require('resend');
+const { google } = require('googleapis');
 
 const app = express();
 app.use(cors());
@@ -14,6 +15,18 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 const PORT = process.env.PORT || 3001;
+const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID;
+const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+const GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
+  ? process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY.replace(/\\n/g, '\n')
+  : undefined;
+const GOOGLE_SHEET_RANGE = process.env.GOOGLE_SHEET_RANGE || 'Sheet1!A1:Z1';
+
+if (GOOGLE_SHEET_ID && GOOGLE_SERVICE_ACCOUNT_EMAIL && GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) {
+  console.log('Google Sheets bookkeeping enabled.');
+} else {
+  console.log('Google Sheets bookkeeping disabled; set GOOGLE_SHEET_ID, GOOGLE_SERVICE_ACCOUNT_EMAIL, and GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY to enable it.');
+}
 
 if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
   console.warn('Warning: RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET not set in environment');
@@ -98,6 +111,127 @@ function appendLedgerEntry(invoice) {
   return entry;
 }
 
+function getSheetsClient() {
+  if (!GOOGLE_SHEET_ID || !GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) {
+    return null;
+  }
+
+  const auth = new google.auth.JWT({
+    email: GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    key: GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
+    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+  });
+
+  return google.sheets({ version: 'v4', auth });
+}
+
+async function ensureSheetHeaderRow(sheets) {
+  const sheetName = GOOGLE_SHEET_RANGE.split('!')[0] || 'Sheet1';
+  const headerRange = `${sheetName}!A1:Z1`;
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId: GOOGLE_SHEET_ID,
+    range: headerRange,
+  });
+
+  const rows = response.data.values || [];
+  if (rows.length === 0 || rows[0].every((cell) => cell === '')) {
+    const headerRow = [
+      'Timestamp',
+      'Invoice Number',
+      'Payment ID',
+      'Order ID',
+      'Receipt',
+      'Customer Name',
+      'Customer Email',
+      'Customer Phone',
+      'Customer Address',
+      'Place of Supply',
+      'GST Required',
+      'GSTIN',
+      'Plan',
+      'Amount (INR)',
+      'Taxable Value (INR)',
+      'Tax Total (INR)',
+      'CGST (INR)',
+      'SGST (INR)',
+      'IGST (INR)',
+      'Export Supply',
+      'GST Breakup',
+      'Payout Gross (INR)',
+      'Payout Fee (INR)',
+      'Payout Net (INR)',
+      'Currency',
+      'Seller Name',
+      'Seller GSTIN',
+    ];
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: headerRange,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [headerRow],
+      },
+    });
+  }
+}
+
+async function appendTransactionToSheet(invoice) {
+  const sheets = getSheetsClient();
+  if (!sheets) {
+    return { success: false, reason: 'missing_google_sheets_configuration' };
+  }
+
+  try {
+    await ensureSheetHeaderRow(sheets);
+
+    const values = [
+      new Date().toISOString(),
+      invoice.invoiceNumber,
+      invoice.paymentId,
+      invoice.orderId,
+      invoice.receipt,
+      invoice.customerName,
+      invoice.customerEmail,
+      invoice.customerPhone,
+      invoice.customerAddress,
+      invoice.placeOfSupply,
+      invoice.gstRequired ? 'Yes' : 'No',
+      invoice.gstin,
+      invoice.plan,
+      invoice.amountValue,
+      invoice.taxableValueNum,
+      invoice.taxTotalNum,
+      invoice.cgstAmountNum,
+      invoice.sgstAmountNum,
+      invoice.igstAmountNum,
+      invoice.exportSupply ? 'Yes' : 'No',
+      invoice.gstBreakup,
+      invoice.payoutEstimateGross,
+      invoice.payoutEstimateFee,
+      invoice.payoutEstimateNet,
+      invoice.currency,
+      invoice.sellerName,
+      invoice.sellerGstin,
+    ];
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: GOOGLE_SHEET_RANGE,
+      valueInputOption: 'USER_ENTERED',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: {
+        values: [values],
+      },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Unable to append transaction to Google Sheet', error);
+    return { success: false, reason: 'google_sheets_error', error: error.message };
+  }
+}
+
 function sanitizeText(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -165,12 +299,18 @@ function buildInvoiceData({ name, phone, email, address, gstRequired, gstin, amo
     paymentId: sanitizeText(paymentId),
     orderId: sanitizeText(orderId),
     receipt: sanitizeText(receipt),
+    amountValue: amountInRupees,
     totalAmount: `₹${amountInRupees.toFixed(2)}`,
     taxableValue: `₹${taxableValueNum.toFixed(2)}`,
+    taxableValueNum,
     taxTotal: `₹${taxTotalNum.toFixed(2)}`,
+    taxTotalNum,
     cgstAmount: `₹${cgstAmountNum.toFixed(2)}`,
+    cgstAmountNum,
     sgstAmount: `₹${sgstAmountNum.toFixed(2)}`,
+    sgstAmountNum,
     igstAmount: `₹${igstAmountNum.toFixed(2)}`,
+    igstAmountNum,
     gstBreakup: exportSupply
       ? 'Export under Letter of Undertaking without payment of Integrated Tax'
       : intraState
@@ -187,6 +327,9 @@ function buildInvoiceData({ name, phone, email, address, gstRequired, gstin, amo
       fee: `₹${payoutEstimate.fee.toFixed(2)}`,
       netPayout: `₹${payoutEstimate.netPayout.toFixed(2)}`,
     },
+    payoutEstimateGross: payoutEstimate.grossAmount,
+    payoutEstimateFee: payoutEstimate.fee,
+    payoutEstimateNet: payoutEstimate.netPayout,
     currency,
     issuedAt: new Date().toISOString(),
     sellerName: 'Anurag Sinha',
@@ -368,6 +511,10 @@ app.post('/api/verify-payment', async (req, res) => {
     });
 
     appendLedgerEntry(invoice);
+    const sheetResult = await appendTransactionToSheet(invoice);
+    if (!sheetResult.success) {
+      console.warn('Google Sheets bookkeeping record could not be appended.', sheetResult);
+    }
     await sendInvoiceEmail(invoice);
     return res.json({ success: true, invoice });
   }
@@ -418,6 +565,10 @@ app.post('/api/payment-callback', async (req, res) => {
     });
 
     appendLedgerEntry(invoice);
+    const sheetResult = await appendTransactionToSheet(invoice);
+    if (!sheetResult.success) {
+      console.warn('Google Sheets bookkeeping record could not be appended.', sheetResult);
+    }
     await sendInvoiceEmail(invoice);
   } catch (error) {
     console.error('Error building invoice during payment-callback redirect flow', error);
