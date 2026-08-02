@@ -365,7 +365,19 @@
           name: 'TracMeds',
           description: planInfo.label + ' — family sharing access',
           order_id: order.order_id,
-          callback_url: SERVER_BASE + '/api/payment-callback?return_url=' + encodeURIComponent(returnUrl) + '&cancel_url=' + encodeURIComponent(cancelUrl),
+          callback_url: SERVER_BASE + '/api/payment-callback?return_url=' + encodeURIComponent(returnUrl) + '&cancel_url=' + encodeURIComponent(cancelUrl) + '&customer_data=' + encodeURIComponent(btoa(JSON.stringify({
+            name: customerNameEl.value,
+            phone: customerPhoneEl.value,
+            email: customerEmailEl.value,
+            address: customerAddressEl.value,
+            place_of_supply: customerStateEl.value,
+            gst_required: gstRequiredEl.checked ? 'yes' : 'no',
+            gstin: customerGstinEl.value,
+            plan,
+            amount: planInfo.amount,
+            currency: 'INR',
+            receipt: 'tracmeds_' + plan + '_' + Date.now()
+          }))),
           redirect: true,
           handler: async function (response) {
             try {
