@@ -87,11 +87,68 @@
       border: 1px solid var(--line);
       border-radius: 16px;
       padding: 20px;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
+    }
+    .form-card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 18px;
+      margin-bottom: 20px;
+      text-align: left;
+    }
+    .form-card h2 {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: 1rem;
+      margin: 0 0 8px;
+    }
+    .form-grid {
+      display: grid;
+      gap: 12px;
+    }
+    .field label {
+      display: block;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .field input, .field select, .field textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font: inherit;
+      color: var(--ink);
+      background: #fff;
+    }
+    .field textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 0 2px;
+      font-size: 0.95rem;
+    }
+    .toggle-row input {
+      width: 16px;
+      height: 16px;
+    }
+    .hint {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 6px;
     }
     .plan-name { font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
     .plan-price { font-family: 'Fraunces', Georgia, serif; font-size: 2rem; font-weight: 600; color: var(--ink); }
     .plan-price span { font-size: 1rem; color: var(--muted); font-weight: 500; }
+    .plan-summary { font-size: 0.9rem; color: var(--muted); line-height: 1.5; margin-top: 8px; }
     .btn {
       display: inline-flex;
       align-items: center;
@@ -135,6 +192,42 @@
     <div class="plan-box">
       <div class="plan-name" id="plan-name">Monthly plan</div>
       <div class="plan-price" id="plan-price">₹149<span>/month</span></div>
+      <div class="plan-summary" id="plan-summary">Customer pays ₹149.00 incl. GST and payment processing charges. Estimated payout to you: ₹145.48.</div>
+    </div>
+
+    <div class="form-card">
+      <h2>Invoice details</h2>
+      <div class="form-grid">
+        <div class="field">
+          <label for="customer-name">Name</label>
+          <input id="customer-name" name="customer-name" type="text" autocomplete="name" placeholder="Your full name" />
+        </div>
+        <div class="field">
+          <label for="customer-phone">Phone number</label>
+          <input id="customer-phone" name="customer-phone" type="tel" autocomplete="tel" placeholder="10-digit phone" />
+        </div>
+        <div class="field">
+          <label for="customer-email">Email</label>
+          <input id="customer-email" name="customer-email" type="email" autocomplete="email" placeholder="you@example.com" />
+        </div>
+        <div class="field">
+          <label for="customer-address">Billing address</label>
+          <textarea id="customer-address" name="customer-address" placeholder="Street, city, state, PIN code"></textarea>
+        </div>
+        <div class="field">
+          <label for="customer-state">Place of supply (State or Outside India)</label>
+          <input id="customer-state" name="customer-state" type="text" placeholder="Maharashtra or Outside India" />
+        </div>
+        <div class="toggle-row">
+          <label for="gst-required">I need a GST invoice</label>
+          <input id="gst-required" name="gst-required" type="checkbox" />
+        </div>
+        <div class="field" id="gstin-field" style="display:none;">
+          <label for="customer-gstin">GSTIN</label>
+          <input id="customer-gstin" name="customer-gstin" type="text" placeholder="22AAAAA0000A1Z5" />
+        </div>
+      </div>
+      <div class="hint">If you request a GST invoice, we will use these details to issue it and keep the transaction record for bookkeeping and compliance.</div>
     </div>
 
     <button id="pay-button" class="btn" type="button">Pay now</button>
@@ -175,11 +268,21 @@
     const planNameEl = document.getElementById('plan-name');
     const planPriceEl = document.getElementById('plan-price');
 
+    function estimatePayout(amountInPaise) {
+      const grossAmount = amountInPaise / 100;
+      const feeBeforeGst = grossAmount * 0.02;
+      const fee = feeBeforeGst + (feeBeforeGst * 0.18);
+      const netPayout = grossAmount - fee;
+      return { grossAmount, fee, netPayout };
+    }
+
     function selectPlan(newPlan) {
       plan = newPlan;
       const info = PLAN_DETAILS[plan];
+      const payout = estimatePayout(info.amount);
       planNameEl.textContent = info.label;
       planPriceEl.innerHTML = info.priceHtml;
+      document.getElementById('plan-summary').innerHTML = `Customer pays ₹${payout.grossAmount.toFixed(2)} incl. GST and payment processing charges. Estimated payout to you: ₹${payout.netPayout.toFixed(2)}.`;
       optionMonthly.classList.toggle('selected', plan === 'monthly');
       optionAnnual.classList.toggle('selected', plan === 'annual');
     }
@@ -201,6 +304,18 @@
 
     const payButton = document.getElementById('pay-button');
     const statusEl = document.getElementById('status');
+    const customerNameEl = document.getElementById('customer-name');
+    const customerPhoneEl = document.getElementById('customer-phone');
+    const customerEmailEl = document.getElementById('customer-email');
+    const customerAddressEl = document.getElementById('customer-address');
+    const customerStateEl = document.getElementById('customer-state');
+    const gstRequiredEl = document.getElementById('gst-required');
+    const gstinFieldEl = document.getElementById('gstin-field');
+    const customerGstinEl = document.getElementById('customer-gstin');
+
+    gstRequiredEl.addEventListener('change', function () {
+      gstinFieldEl.style.display = gstRequiredEl.checked ? 'block' : 'none';
+    });
 
     function setStatus(message, isError) {
       statusEl.textContent = message || '';
@@ -225,7 +340,16 @@
           body: JSON.stringify({
             amount: planInfo.amount,
             currency: 'INR',
-            receipt: 'tracmeds_' + plan + '_' + Date.now()
+            receipt: 'tracmeds_' + plan + '_' + Date.now(),
+            notes: {
+              name: customerNameEl.value,
+              phone: customerPhoneEl.value,
+              email: customerEmailEl.value,
+              place_of_supply: customerStateEl.value,
+              gst_required: gstRequiredEl.checked ? 'yes' : 'no',
+              gstin: customerGstinEl.value,
+              plan
+            }
           })
         });
 
@@ -241,14 +365,41 @@
           name: 'TracMeds',
           description: planInfo.label + ' — family sharing access',
           order_id: order.order_id,
-          callback_url: SERVER_BASE + '/api/payment-callback?return_url=' + encodeURIComponent(returnUrl) + '&cancel_url=' + encodeURIComponent(cancelUrl),
+          callback_url: SERVER_BASE + '/api/payment-callback?return_url=' + encodeURIComponent(returnUrl) + '&cancel_url=' + encodeURIComponent(cancelUrl) + '&customer_data=' + encodeURIComponent(btoa(JSON.stringify({
+            name: customerNameEl.value,
+            phone: customerPhoneEl.value,
+            email: customerEmailEl.value,
+            address: customerAddressEl.value,
+            place_of_supply: customerStateEl.value,
+            gst_required: gstRequiredEl.checked ? 'yes' : 'no',
+            gstin: customerGstinEl.value,
+            plan,
+            amount: planInfo.amount,
+            currency: 'INR',
+            receipt: 'tracmeds_' + plan + '_' + Date.now()
+          }))),
           redirect: true,
           handler: async function (response) {
             try {
               const verifyRes = await fetch(SERVER_BASE + '/api/verify-payment', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(response)
+                body: JSON.stringify({
+                  ...response,
+                  notes: {
+                    name: customerNameEl.value,
+                    phone: customerPhoneEl.value,
+                    email: customerEmailEl.value,
+                    address: customerAddressEl.value,
+                    place_of_supply: document.getElementById('customer-state').value,
+                    gst_required: gstRequiredEl.checked ? 'yes' : 'no',
+                    gstin: customerGstinEl.value,
+                    plan,
+                    amount: planInfo.amount,
+                    currency: 'INR',
+                    receipt: 'tracmeds_' + plan + '_' + Date.now()
+                  }
+                })
               });
               const verifyData = await verifyRes.json();
               if (verifyRes.ok && verifyData.success) {
