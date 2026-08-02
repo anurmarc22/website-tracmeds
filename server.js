@@ -366,7 +366,7 @@ app.post('/api/verify-payment', async (req, res) => {
   return res.status(400).json({ success: false, error: 'Signature mismatch' });
 });
 
-app.post('/api/payment-callback', (req, res) => {
+app.post('/api/payment-callback', async (req, res) => {
   const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = req.body;
   const returnUrl = req.query.return_url || 'tracmeds://payment/complete';
   const cancelUrl = req.query.cancel_url || 'tracmeds://payment/cancel';
@@ -381,10 +381,43 @@ app.post('/api/payment-callback', (req, res) => {
     .update(razorpay_order_id + '|' + razorpay_payment_id)
     .digest('hex');
 
-  if (generated_signature === razorpay_signature) {
-    return res.redirect(302, checkoutPageUrl + '?callback_status=success&return_url=' + encodeURIComponent(returnUrl) + '&cancel_url=' + encodeURIComponent(cancelUrl));
+  if (generated_signature !== razorpay_signature) {
+    return res.redirect(302, checkoutPageUrl + '?callback_status=failed&return_url=' + encodeURIComponent(returnUrl) + '&cancel_url=' + encodeURIComponent(cancelUrl));
   }
-  return res.redirect(302, checkoutPageUrl + '?callback_status=failed&return_url=' + encodeURIComponent(returnUrl) + '&cancel_url=' + encodeURIComponent(cancelUrl));
+
+  // Signature verified — now build the invoice/ledger/email, same as /api/verify-payment,
+  // since this redirect-flow path bypasses that route entirely.
+  try {
+    let notes = {};
+    if (req.query.customer_data) {
+      notes = JSON.parse(Buffer.from(decodeURIComponent(req.query.customer_data), 'base64').toString('utf8'));
+    }
+
+    const invoice = buildInvoiceData({
+      name: notes.name,
+      phone: notes.phone,
+      email: notes.email,
+      address: notes.address,
+      placeOfSupply: notes.place_of_supply,
+      gstRequired: notes.gst_required === 'yes',
+      gstin: notes.gstin,
+      amount: notes.amount || 0,
+      currency: notes.currency || 'INR',
+      plan: notes.plan,
+      paymentId: razorpay_payment_id,
+      orderId: razorpay_order_id,
+      receipt: notes.receipt,
+    });
+
+    appendLedgerEntry(invoice);
+    await sendInvoiceEmail(invoice);
+  } catch (error) {
+    console.error('Error building invoice during payment-callback redirect flow', error);
+    // Don't block the user's redirect just because invoice/ledger logging failed —
+    // the payment itself is already verified and successful at this point.
+  }
+
+  return res.redirect(302, checkoutPageUrl + '?callback_status=success&return_url=' + encodeURIComponent(returnUrl) + '&cancel_url=' + encodeURIComponent(cancelUrl));
 });
 
 if (require.main === module) {
