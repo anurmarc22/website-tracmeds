@@ -188,6 +188,17 @@
     optionAnnual.addEventListener('click', function () { selectPlan('annual'); });
     selectPlan(plan);
 
+    // Handle return from the backend's redirect-flow callback (used by Safari and some browsers)
+    const callbackStatus = params.get('callback_status');
+    if (callbackStatus === 'success') {
+      document.querySelector('.card').style.display = 'none';
+      document.getElementById('success-card').style.display = 'block';
+      window.location.href = returnUrl + (returnUrl.includes('?') ? '&' : '?') + 'status=success';
+    } else if (callbackStatus === 'failed') {
+      setStatus('Payment could not be verified. Please contact support if you were charged.', true);
+      window.location.href = cancelUrl + (cancelUrl.includes('?') ? '&' : '?') + 'status=failed';
+    }
+
     const payButton = document.getElementById('pay-button');
     const statusEl = document.getElementById('status');
 
@@ -230,6 +241,8 @@
           name: 'TracMeds',
           description: planInfo.label + ' — family sharing access',
           order_id: order.order_id,
+          callback_url: SERVER_BASE + '/api/payment-callback?return_url=' + encodeURIComponent(returnUrl) + '&cancel_url=' + encodeURIComponent(cancelUrl),
+          redirect: true,
           handler: async function (response) {
             try {
               const verifyRes = await fetch(SERVER_BASE + '/api/verify-payment', {
