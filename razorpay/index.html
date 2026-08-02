@@ -141,6 +141,13 @@
     <div class="status" id="status"></div>
   </main>
 
+  <main class="card" id="success-card" style="display:none;">
+    <div style="font-size:2.5rem; margin-bottom:8px;">✅</div>
+    <h1>Payment successful</h1>
+    <p class="sub">Your payment went through. If you started this from the TracMeds app on your phone, you can now return to it — your plan will be active there.</p>
+    <p class="sub" style="margin-top:16px; font-size:0.88rem;">If nothing happens automatically, just open the TracMeds app on the same phone to see your unlocked plan.</p>
+  </main>
+
   <script>
     const SERVER_BASE = 'https://website-tracmeds-backend-on-render.onrender.com';
     const RAZORPAY_KEY_ID = 'rzp_test_TKnYyH9nXpdyV2';
@@ -189,6 +196,11 @@
       statusEl.classList.toggle('error', Boolean(isError));
     }
 
+    function showSuccessScreen() {
+      document.querySelector('.card').style.display = 'none';
+      document.getElementById('success-card').style.display = 'block';
+    }
+
     payButton.addEventListener('click', async function () {
       payButton.disabled = true;
       payButton.textContent = 'Opening secure checkout…';
@@ -227,6 +239,7 @@
               });
               const verifyData = await verifyRes.json();
               if (verifyRes.ok && verifyData.success) {
+                showSuccessScreen();
                 window.location.href = returnUrl + (returnUrl.includes('?') ? '&' : '?') + 'status=success';
               } else {
                 setStatus('Payment verification failed. Please contact support if you were charged.', true);
