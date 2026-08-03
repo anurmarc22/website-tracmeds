@@ -99,9 +99,9 @@ function isExpired(expiresAt: string | null): boolean {
 function getCheckoutUrl(pkg: SubscriptionPackage) {
   const plan = pkg.identifier.toLowerCase();
   const baseUrl = 'https://www.tracmeds.com';
-  if (plan.includes('annual')) return `${baseUrl}?plan=annual&return_url=${encodeURIComponent(RAZORPAY_RETURN_URL)}&cancel_url=${encodeURIComponent(RAZORPAY_CANCEL_URL)}`;
-  if (plan.includes('month')) return `${baseUrl}?plan=monthly&return_url=${encodeURIComponent(RAZORPAY_RETURN_URL)}&cancel_url=${encodeURIComponent(RAZORPAY_CANCEL_URL)}`;
-  return `${baseUrl}?plan=monthly&return_url=${encodeURIComponent(RAZORPAY_RETURN_URL)}&cancel_url=${encodeURIComponent(RAZORPAY_CANCEL_URL)}`;
+  const cacheBuster = Date.now();
+  const resolvedPlan = plan.includes('annual') ? 'annual' : 'monthly';
+  return `${baseUrl}?plan=${resolvedPlan}&return_url=${encodeURIComponent(RAZORPAY_RETURN_URL)}&cancel_url=${encodeURIComponent(RAZORPAY_CANCEL_URL)}&v=${cacheBuster}`;
 }
 
 async function saveSubscriptionRecord(pkg: SubscriptionPackage, status: SubscriptionRecord['status']): Promise<SubscriptionRecord> {
