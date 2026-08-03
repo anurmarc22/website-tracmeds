@@ -247,7 +247,7 @@
   <script>
     const SERVER_BASE = 'https://website-tracmeds-backend-on-render.onrender.com';
     const RAZORPAY_KEY_ID = 'rzp_test_TKnYyH9nXpdyV2';
-    const MERCHANT_LOGO_URL = 'https://www.tracmeds.com/icon.png';
+    const MERCHANT_LOGO_URL = 'https://www.tracmeds.com/icon.png?v=2';
 
     const PLAN_DETAILS = {
       monthly: { amount: 14900, label: 'Monthly plan', priceHtml: '₹149<span>/month</span>' },
@@ -424,7 +424,7 @@
               window.location.href = cancelUrl + (cancelUrl.includes('?') ? '&' : '?') + 'status=cancel';
             }
           },
-          theme: { color: '#6f4fd8' }
+          theme: { color: '#1A3FAA' }
         };
 
         const rzp = new window.Razorpay(options);
