@@ -13,6 +13,19 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.static(__dirname));
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+app.get('/checkout', (req, res) => {
+  res.sendFile(path.join(__dirname, 'razorpay-checkout.html'));
+});
+
+app.get('/razorpay-checkout.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'razorpay-checkout.html'));
+});
 
 const PORT = process.env.PORT || 3001;
 const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID;
@@ -600,10 +613,13 @@ app.post('/api/payment-callback', async (req, res) => {
   const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = req.body;
   const returnUrl = req.query.return_url || 'tracmeds://payment/complete';
   const cancelUrl = req.query.cancel_url || 'tracmeds://payment/cancel';
-  const checkoutPageUrl = 'https://www.tracmeds.com/';
+  const appendStatus = (url, status) => {
+    const separator = String(url).includes('?') ? '&' : '?';
+    return `${url}${separator}status=${encodeURIComponent(status)}`;
+  };
 
   if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature) {
-    return res.redirect(302, checkoutPageUrl + '?callback_status=failed&return_url=' + encodeURIComponent(returnUrl) + '&cancel_url=' + encodeURIComponent(cancelUrl));
+    return res.redirect(302, appendStatus(cancelUrl, 'failed'));
   }
 
   const generated_signature = crypto
@@ -612,7 +628,7 @@ app.post('/api/payment-callback', async (req, res) => {
     .digest('hex');
 
   if (generated_signature !== razorpay_signature) {
-    return res.redirect(302, checkoutPageUrl + '?callback_status=failed&return_url=' + encodeURIComponent(returnUrl) + '&cancel_url=' + encodeURIComponent(cancelUrl));
+    return res.redirect(302, appendStatus(cancelUrl, 'failed'));
   }
 
   // Signature verified — now build the invoice/ledger/email, same as /api/verify-payment,
@@ -651,7 +667,7 @@ app.post('/api/payment-callback', async (req, res) => {
     // the payment itself is already verified and successful at this point.
   }
 
-  return res.redirect(302, checkoutPageUrl + '?callback_status=success&return_url=' + encodeURIComponent(returnUrl) + '&cancel_url=' + encodeURIComponent(cancelUrl));
+  return res.redirect(302, appendStatus(returnUrl, 'success'));
 });
 
 // Appends a subscription lifecycle event (active, renewed, expired) to the
