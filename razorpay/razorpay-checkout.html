@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#6f4fd8" />
   <title>Complete your purchase — TracMeds</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="./icon.png?v=2" />
+  <link rel="shortcut icon" href="./icon.png?v=2" type="image/png" />
+  <link rel="apple-touch-icon" href="./icon.png?v=2" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -171,8 +174,8 @@
 </head>
 <body>
   <main class="card">
-    <a href="/index.html" class="logo-row">
-      <img src="/icon.png" alt="TracMeds" />
+    <a href="./index.html" class="logo-row">
+      <img src="./icon.png?v=2" alt="TracMeds" />
       <span>TracMeds</span>
     </a>
     <h1>Complete your purchase</h1>
@@ -216,7 +219,7 @@
         </div>
         <div class="field">
           <label for="customer-state">Place of supply (State or Outside India)</label>
-          <input id="customer-state" name="customer-state" type="text" placeholder="Maharashtra or Outside India" />
+          <input id="customer-state" name="customer-state" type="text" placeholder="e.g. New Delhi, Karnataka, Maharashtra, or Outside India" />
         </div>
         <div class="toggle-row">
           <label for="gst-required">I need a GST invoice</label>
@@ -244,6 +247,7 @@
   <script>
     const SERVER_BASE = 'https://website-tracmeds-backend-on-render.onrender.com';
     const RAZORPAY_KEY_ID = 'rzp_test_TKnYyH9nXpdyV2';
+    const MERCHANT_LOGO_URL = 'https://www.tracmeds.com/icon.png';
 
     const PLAN_DETAILS = {
       monthly: { amount: 14900, label: 'Monthly plan', priceHtml: '₹149<span>/month</span>' },
@@ -362,6 +366,7 @@
           key: RAZORPAY_KEY_ID,
           amount: order.amount,
           currency: order.currency,
+          image: MERCHANT_LOGO_URL,
           name: 'TracMeds',
           description: planInfo.label + ' — family sharing access',
           order_id: order.order_id,
