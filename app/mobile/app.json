@@ -1,0 +1,54 @@
+{
+  "expo": {
+    "name": "TracMeds",
+    "slug": "tracmeds",
+    "version": "1.0.1",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "tracmeds",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1A3FAA"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.tracmeds.app"
+    },
+    "android": {
+      "package": "com.tracmeds.app",
+      "versionCode": 4
+    },
+    "web": {
+      "favicon": "./assets/images/icon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#1A3FAA"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "apkUpdate": {
+        "manifestUrl": "https://www.tracmeds.com/app-update.json",
+        "fallbackDownloadUrl": "https://www.tracmeds.com/download.html"
+      },
+      "eas": {
+        "projectId": "0b98b36e-508a-473d-b4e1-def2ef8d570d"
+      }
+    }
+  }
+}
