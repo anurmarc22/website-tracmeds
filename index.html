@@ -1030,9 +1030,8 @@ if (callbackStatus === 'success') {
 } else if (callbackStatus === 'failed') {
   window.location.href = `${cancelUrl}?error=${encodeURIComponent('Payment callback failed')}`;
 } else if (shouldAutoOpenCheckout) {
-  window.setTimeout(function() {
-    startCheckout();
-  }, 250);
+  const formCheckoutUrl = `razorpay-checkout.html?plan=${encodeURIComponent(plan)}&return_url=${encodeURIComponent(returnUrl)}&cancel_url=${encodeURIComponent(cancelUrl)}`;
+  window.location.href = formCheckoutUrl;
 }
     </script>
 
