@@ -124,6 +124,21 @@ function appendLedgerEntry(invoice) {
   return entry;
 }
 
+function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
+
+function normalizePhone(phone) {
+  const digits = String(phone || '').replace(/\D/g, '');
+  // Match by last 10 digits so +91 prefixes do not break restore.
+  return digits.length > 10 ? digits.slice(-10) : digits;
+}
+
+function getPlanDurationDays(plan) {
+  const raw = String(plan || '').toLowerCase();
+  return raw.includes('annual') ? 365 : 30;
+}
+
 function getSheetsClient() {
   if (!GOOGLE_SHEET_ID || !GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) {
     return null;
@@ -754,6 +769,66 @@ app.post('/api/subscription-expired', async (req, res) => {
   const result = await appendSubscriptionEventToSheet(req.body);
   if (!result.success) console.warn('Subscription expired sheet append failed', result);
   return res.json({ success: true });
+});
+
+// Restore endpoint for website-APK users who reinstall, clear data, or move devices.
+// Matches by email/phone against successful payment ledger entries and restores if
+// the latest matching purchase is still within its plan period.
+app.post('/api/restore-subscription', async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    const phone = normalizePhone(req.body?.phone);
+    if (!email && !phone) {
+      return res.status(400).json({ success: false, error: 'Provide email or phone to restore.' });
+    }
+
+    const entries = getLedgerEntries();
+    const matches = entries.filter((entry) => {
+      const entryEmail = normalizeEmail(entry.customerEmail);
+      const entryPhone = normalizePhone(entry.customerPhone);
+      const emailMatch = email ? entryEmail === email : false;
+      const phoneMatch = phone ? entryPhone === phone : false;
+      return emailMatch || phoneMatch;
+    });
+
+    if (matches.length === 0) {
+      return res.status(404).json({ success: false, error: 'No purchase found for these details.' });
+    }
+
+    matches.sort((a, b) => {
+      const ta = new Date(a.timestamp || 0).getTime();
+      const tb = new Date(b.timestamp || 0).getTime();
+      return tb - ta;
+    });
+
+    const latest = matches[0];
+    const plan = String(latest.plan || 'monthly').toLowerCase();
+    const startedAt = latest.timestamp ? new Date(latest.timestamp) : new Date();
+    const expiresAt = new Date(startedAt.getTime() + getPlanDurationDays(plan) * 24 * 60 * 60 * 1000);
+    const now = Date.now();
+
+    if (expiresAt.getTime() <= now) {
+      return res.json({
+        success: false,
+        expired: true,
+        plan,
+        startedAt: startedAt.toISOString(),
+        expiresAt: expiresAt.toISOString(),
+        error: 'Plan found, but it has expired.',
+      });
+    }
+
+    return res.json({
+      success: true,
+      plan,
+      startedAt: startedAt.toISOString(),
+      expiresAt: expiresAt.toISOString(),
+      customerName: latest.customerName || '',
+    });
+  } catch (err) {
+    console.error('restore-subscription error', err);
+    return res.status(500).json({ success: false, error: 'server_error' });
+  }
 });
 
 if (require.main === module) {
