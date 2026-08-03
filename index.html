@@ -849,6 +849,7 @@
       const cancelUrl = params.get('cancel_url') || 'tracmeds://payment/cancel';
       const orderApiUrl = params.get('order_api_url') || `${SERVER_BASE.replace(/\/$/, '')}/api/checkout/create-order`;
       const verifyApiUrl = params.get('verify_api_url') || `${SERVER_BASE.replace(/\/$/, '')}/api/checkout/verify-payment`;
+      const CHECKOUT_LOGO_URL = new URL('icon.png?v=2', window.location.origin).toString();
 
       // Map plan to amount in paise
       const PLAN_AMOUNTS = {
@@ -887,6 +888,7 @@
             key: orderData.key_id || RAZORPAY_KEY_ID,
             amount: orderData.amount || AMOUNT,
             currency: orderData.currency || 'INR',
+            image: CHECKOUT_LOGO_URL,
             name: 'TracMeds',
             description: `${plan === 'annual' ? 'Annual' : 'Monthly'} family sharing access`,
             order_id: orderData.order_id,
@@ -924,7 +926,7 @@
               email: ''
             },
             theme: {
-              color: '#6f4fd8'
+              color: '#1A3FAA'
             }
           };
 
