@@ -1,0 +1,435 @@
+import React, { useState } from 'react';
+import {
+  View, Text, ScrollView, TouchableOpacity, TextInput,
+  StyleSheet, Alert, Platform, Modal, KeyboardAvoidingView,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useColors } from '@/hooks/useColors';
+import { useApp } from '@/context/AppContext';
+import { useSubscription } from '@/context/SubscriptionContext';
+import TimeInput12h from '@/components/TimeInput12h';
+import ExportModal from './ExportModal';
+import { formatTime12 } from '@/utils/time';
+import { UserProfile, NotificationContact, ContactRelation } from '@/types';
+
+const GENDER_OPTIONS: { value: NonNullable<UserProfile['gender']>; label: string }[] = [
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'other', label: 'Other' },
+];
+
+const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
+
+const RELATIONS: { value: ContactRelation; label: string; icon: string; color: string }[] = [
+  { value: 'self', label: 'Self', icon: 'person', color: '#1A3FAA' },
+  { value: 'parent', label: 'Parent', icon: 'people', color: '#F9A825' },
+  { value: 'child', label: 'Child', icon: 'happy', color: '#22C55E' },
+  { value: 'caregiver', label: 'Caregiver', icon: 'medical', color: '#9C6FE4' },
+  { value: 'partner', label: 'Partner', icon: 'heart', color: '#E91E8C' },
+];
+
+function EditProfileModal({ visible, profile, onClose, onSave, colors }: {
+  visible: boolean; profile: UserProfile; onClose: () => void;
+  onSave: (data: Partial<UserProfile>) => void; colors: ReturnType<typeof useColors>;
+}) {
+  const [name, setName] = useState(profile.name);
+  const [age, setAge] = useState(profile.age ?? '');
+  const [gender, setGender] = useState(profile.gender);
+  const [bloodType, setBloodType] = useState(profile.bloodType ?? '');
+  const s = editStyles(colors);
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={s.overlay}>
+        <View style={s.sheet}>
+          <View style={s.handle} />
+          <View style={s.header}>
+            <Text style={s.headerTitle}>Edit Profile</Text>
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Ionicons name="close" size={24} color={colors.mutedForeground} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <Text style={s.label}>Full Name</Text>
+            <TextInput style={s.input} value={name} onChangeText={setName} placeholder="Your name" placeholderTextColor={colors.mutedForeground} />
+            <Text style={s.label}>Age</Text>
+            <TextInput style={s.input} value={age} onChangeText={setAge} placeholder="e.g. 32" placeholderTextColor={colors.mutedForeground} keyboardType="numeric" />
+            <Text style={s.label}>Gender</Text>
+            <View style={s.segRow}>
+              {GENDER_OPTIONS.map(g => (
+                <TouchableOpacity key={g.value} style={[s.seg, gender === g.value && { backgroundColor: colors.primary }]} onPress={() => setGender(g.value)}>
+                  <Text style={[s.segText, gender === g.value && { color: '#fff' }]}>{g.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={s.label}>Blood Type</Text>
+            <View style={s.bloodGrid}>
+              {BLOOD_TYPES.map(bt => (
+                <TouchableOpacity key={bt} style={[s.bloodBtn, bloodType === bt && { backgroundColor: colors.destructive, borderColor: colors.destructive }]} onPress={() => setBloodType(bloodType === bt ? '' : bt)}>
+                  <Text style={[s.bloodBtnText, bloodType === bt && { color: '#fff' }]}>{bt}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity style={s.saveBtn} onPress={() => { onSave({ name, age: age || undefined, gender, bloodType: bloodType || undefined }); onClose(); }} activeOpacity={0.85}>
+              <Text style={s.saveBtnText}>Save Profile</Text>
+            </TouchableOpacity>
+            <View style={{ height: 24 }} />
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+function editStyles(colors: ReturnType<typeof useColors>) {
+  return StyleSheet.create({
+    overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+    sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingBottom: 8, maxHeight: '90%' },
+    handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginTop: 12, marginBottom: 4 },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16 },
+    headerTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', color: colors.foreground },
+    label: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: colors.mutedForeground, marginBottom: 6, marginTop: 14, letterSpacing: 0.8, textTransform: 'uppercase' },
+    input: { backgroundColor: colors.input, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, fontFamily: 'Inter_400Regular', color: colors.foreground },
+    segRow: { flexDirection: 'row', gap: 8 },
+    seg: { flex: 1, paddingVertical: 10, borderRadius: 10, backgroundColor: colors.muted, alignItems: 'center' },
+    segText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: colors.mutedForeground },
+    bloodGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    bloodBtn: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.muted },
+    bloodBtnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: colors.mutedForeground },
+    saveBtn: { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 24 },
+    saveBtnText: { color: '#fff', fontSize: 16, fontFamily: 'Inter_700Bold' },
+  });
+}
+
+function AddContactModal({ visible, onClose, onSave, colors }: {
+  visible: boolean; onClose: () => void;
+  onSave: (c: Omit<NotificationContact, 'id'>) => void; colors: ReturnType<typeof useColors>;
+}) {
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [relation, setRelation] = useState<ContactRelation>('parent');
+  const s = editStyles(colors);
+  const handleSave = () => {
+    if (!name.trim()) { Alert.alert('Required', 'Enter a name.'); return; }
+    if (!phone.trim()) { Alert.alert('Required', 'Enter a WhatsApp phone number with country code.'); return; }
+    onSave({ name: name.trim(), phone: phone.trim(), relation });
+    setName(''); setPhone(''); setRelation('parent');
+    onClose();
+  };
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={s.overlay}>
+        <View style={s.sheet}>
+          <View style={s.handle} />
+          <View style={s.header}>
+            <Text style={s.headerTitle}>Add Contact</Text>
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Ionicons name="close" size={24} color={colors.mutedForeground} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView keyboardShouldPersistTaps="handled">
+            <Text style={s.label}>Name</Text>
+            <TextInput style={s.input} value={name} onChangeText={setName} placeholder="e.g. Mom, Dr. Cruz" placeholderTextColor={colors.mutedForeground} />
+            <Text style={s.label}>WhatsApp Number</Text>
+            <TextInput style={s.input} value={phone} onChangeText={setPhone}
+              placeholder="+63912345678 (with country code)" placeholderTextColor={colors.mutedForeground} keyboardType="phone-pad" />
+            <Text style={s.label}>Relation</Text>
+            <View style={{ gap: 8 }}>
+              {RELATIONS.map(r => (
+                <TouchableOpacity key={r.value} style={[s.seg, { flexDirection: 'row', gap: 10, justifyContent: 'flex-start', paddingHorizontal: 14, borderWidth: 1.5, borderColor: relation === r.value ? r.color : colors.border, backgroundColor: relation === r.value ? r.color + '15' : colors.muted }]} onPress={() => setRelation(r.value)}>
+                  <Ionicons name={r.icon as any} size={18} color={relation === r.value ? r.color : colors.mutedForeground} />
+                  <Text style={[s.segText, relation === r.value && { color: r.color }]}>{r.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity style={[s.saveBtn, { backgroundColor: '#25D366', marginTop: 20 }]} onPress={handleSave}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="logo-whatsapp" size={20} color="#fff" />
+                <Text style={s.saveBtnText}>Add WhatsApp Contact</Text>
+              </View>
+            </TouchableOpacity>
+            <View style={{ height: 24 }} />
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+export default function ProfileScreen() {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const {
+    profile, updateProfile, appointments, healthLogs, medicines, contacts, addContact, deleteContact,
+    reportSettings, updateReportSettings, sendDailyReport,
+  } = useApp();
+  const { isPro, expiresAt, daysRemaining } = useSubscription();
+  const [showEdit, setShowEdit] = useState(false);
+  const [showAddContact, setShowAddContact] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+
+  const isWeb = Platform.OS === 'web';
+  const topPad = isWeb ? 67 : insets.top;
+  const bottomPad = isWeb ? 34 : insets.bottom;
+
+  const initials = profile.name ? profile.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '?';
+
+  const handleDeleteContact = (id: string) => {
+    Alert.alert('Remove Contact', 'Remove this notification contact?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: () => deleteContact(id) },
+    ]);
+  };
+
+  const s = makeStyles(colors);
+
+  return (
+    <View style={[s.container, { paddingTop: topPad }]}>
+      {/* TracMeds brand bar */}
+      <View style={s.brandBar}>
+        <Ionicons name="medical" size={13} color={colors.primary} />
+        <Text style={s.brandText}>TracMeds</Text>
+      </View>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[s.content, { paddingBottom: bottomPad + 90 }]}>
+        {/* Hero */}
+        <LinearGradient colors={[colors.primary, '#2563EB']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.hero}>
+          <View style={s.avatarWrap}>
+            <View style={s.avatar}><Text style={s.avatarText}>{initials}</Text></View>
+          </View>
+          <Text style={s.name}>{profile.name || 'Your Name'}</Text>
+          <View style={s.statsRow}>
+            <View style={s.stat}><Text style={s.statVal}>{medicines.filter(m => m.active).length}</Text><Text style={s.statLbl}>Medicines</Text></View>
+            <View style={s.statDiv} />
+            <View style={s.stat}><Text style={s.statVal}>{appointments.length}</Text><Text style={s.statLbl}>Appointments</Text></View>
+            <View style={s.statDiv} />
+            <View style={s.stat}><Text style={s.statVal}>{healthLogs.length}</Text><Text style={s.statLbl}>Readings</Text></View>
+          </View>
+        </LinearGradient>
+
+        {/* Personal info */}
+        <View style={s.card}>
+          <View style={s.cardHeader}>
+            <Text style={s.cardTitle}>Personal Info</Text>
+            <TouchableOpacity style={s.editBtn} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowEdit(true); }}>
+              <Ionicons name="create-outline" size={16} color={colors.primary} />
+              <Text style={[s.editBtnText, { color: colors.primary }]}>Edit</Text>
+            </TouchableOpacity>
+          </View>
+          {[
+            { label: 'Name', value: profile.name || undefined },
+            { label: 'Age', value: profile.age },
+            { label: 'Gender', value: profile.gender ? profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1) : undefined },
+            { label: 'Blood Type', value: profile.bloodType },
+          ].map(row => (
+            <View key={row.label} style={s.infoRow}>
+              <Text style={s.infoLabel}>{row.label}</Text>
+              <Text style={row.value ? s.infoValue : s.infoEmpty}>{row.value ?? 'Not set'}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Notification contacts */}
+        <View style={s.card}>
+          <View style={s.cardHeader}>
+            <View>
+              <Text style={s.cardTitle}>WhatsApp Contacts</Text>
+              <Text style={s.cardSub}>Receive appointment & health updates</Text>
+            </View>
+            <TouchableOpacity style={[s.editBtn, { backgroundColor: '#25D366', paddingHorizontal: 12 }]}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowAddContact(true); }}>
+              <Ionicons name="add" size={16} color="#fff" />
+              <Text style={[s.editBtnText, { color: '#fff' }]}>Add</Text>
+            </TouchableOpacity>
+          </View>
+
+          {contacts.length === 0 ? (
+            <TouchableOpacity style={s.emptyContacts} onPress={() => setShowAddContact(true)}>
+              <Ionicons name="logo-whatsapp" size={28} color="#25D366" />
+              <Text style={s.emptyContactsText}>Add a parent, child, or caregiver to receive WhatsApp health notifications</Text>
+            </TouchableOpacity>
+          ) : (
+            contacts.map(c => {
+              const rel = RELATIONS.find(r => r.value === c.relation);
+              return (
+                <View key={c.id} style={s.contactCard}>
+                  <View style={[s.contactIcon, { backgroundColor: (rel?.color ?? colors.primary) + '20' }]}>
+                    <Ionicons name={(rel?.icon ?? 'person') as any} size={20} color={rel?.color ?? colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.contactName}>{c.name}</Text>
+                    <Text style={s.contactMeta}>{rel?.label ?? c.relation} · {c.phone}</Text>
+                  </View>
+                  <Ionicons name="logo-whatsapp" size={18} color="#25D366" style={{ marginRight: 8 }} />
+                  <TouchableOpacity onPress={() => handleDeleteContact(c.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="close-circle" size={20} color={colors.destructive} />
+                  </TouchableOpacity>
+                </View>
+              );
+            })
+          )}
+        </View>
+
+        {/* Daily Family Report settings */}
+        <View style={s.card}>
+          <View style={s.cardHeader}>
+            <View>
+              <Text style={s.cardTitle}>Family sharing</Text>
+              <Text style={s.cardSub}>
+                {isPro
+                  ? daysRemaining !== null && daysRemaining <= 7
+                    ? `⚠️ Expires in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'}`
+                    : expiresAt
+                      ? `Active · expires ${new Date(expiresAt).toLocaleDateString('en-IN')}`
+                      : 'Sent each evening via WhatsApp'
+                  : expiresAt && !isPro
+                    ? `Expired on ${new Date(expiresAt).toLocaleDateString('en-IN')} — renew to continue`
+                    : 'Unlock the Daily Family Report after purchase.'}
+              </Text>
+            </View>
+          </View>
+
+          <Text style={[s.settingLabel, { marginBottom: 8 }]}>Reminder time</Text>
+          <TimeInput12h
+            value={reportSettings.time}
+            onChange={(t) => updateReportSettings({ time: t })}
+            activeColor={colors.primary}
+          />
+
+          {contacts.length > 0 && (
+            <>
+              <Text style={[s.settingLabel, { marginTop: 16, marginBottom: 8 }]}>Send report to</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {contacts.map(c => {
+                  const selected = reportSettings.contactIds.includes(c.id);
+                  return (
+                    <TouchableOpacity
+                      key={c.id}
+                      style={[s.recipientChip, selected && { backgroundColor: colors.primary }]}
+                      onPress={() => {
+                        const next = selected
+                          ? reportSettings.contactIds.filter(id => id !== c.id)
+                          : [...reportSettings.contactIds, c.id];
+                        updateReportSettings({ contactIds: next });
+                      }}
+                    >
+                      <Text style={[s.recipientChipText, selected && { color: '#fff' }]}>{c.name}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </>
+          )}
+
+          <TouchableOpacity
+            style={[s.sendNowBtn, !isPro && { opacity: 0.5 }]}
+            disabled={!isPro}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); sendDailyReport(); }}
+          >
+            <Ionicons name="logo-whatsapp" size={18} color="#fff" />
+            <Text style={s.sendNowBtnText}>Send Today's Report Now</Text>
+          </TouchableOpacity>
+          <Text style={s.reminderNote}>Daily reminder at {formatTime12(reportSettings.time)}</Text>
+        </View>
+
+        {/* Export / Send recorded data — gated behind active subscription */}
+        <View style={s.card}>
+          <View style={s.cardHeader}>
+            <View>
+              <Text style={s.cardTitle}>Export & Send Data</Text>
+              <Text style={s.cardSub}>
+                {isPro
+                  ? 'Export your records for a chosen date range or share a formatted report'
+                  : 'Unlock family sharing to export and share your records'}
+              </Text>
+            </View>
+            {!isPro && <Ionicons name="lock-closed" size={18} color={colors.mutedForeground} />}
+          </View>
+
+          <TouchableOpacity
+            style={[s.saveBtn, !isPro && { opacity: 0.45 }]}
+            disabled={!isPro}
+            onPress={() => setShowExport(true)}
+          >
+            <Ionicons name="download-outline" size={18} color="#fff" />
+            <Text style={[s.saveBtnText, { marginLeft: 8 }]}>Export / Share Records</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Notification info */}
+        <View style={[s.card, { backgroundColor: '#25D36615', borderWidth: 1, borderColor: '#25D36630' }]}>
+          <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
+            <Ionicons name="logo-whatsapp" size={22} color="#25D366" />
+            <Text style={[s.cardSub, { flex: 1 }]}>
+              Share appointments, medicines, and health readings directly to WhatsApp contacts. Tap the WhatsApp icon on any record to send an update.
+            </Text>
+          </View>
+        </View>
+
+        {/* Settings */}
+        <View style={s.card}>
+          <Text style={s.cardTitle}>More</Text>
+          <TouchableOpacity style={s.settingRow} onPress={() => router.push('/terms')}>
+            <View style={[s.settingIcon, { backgroundColor: colors.muted }]}>
+              <Ionicons name="document-text-outline" size={18} color={colors.mutedForeground} />
+            </View>
+            <Text style={s.settingLabel}>Terms & Privacy</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.border} />
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+      <EditProfileModal visible={showEdit} profile={profile} colors={colors} onClose={() => setShowEdit(false)} onSave={updateProfile} />
+      <AddContactModal visible={showAddContact} colors={colors} onClose={() => setShowAddContact(false)} onSave={addContact} />
+      <ExportModal visible={showExport} onClose={() => setShowExport(false)} />
+    </View>
+  );
+}
+
+function makeStyles(colors: ReturnType<typeof useColors>) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    brandBar: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 20, paddingTop: 6, paddingBottom: 4 },
+    brandText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.primary, letterSpacing: 0.8, textTransform: 'uppercase' },
+    content: { gap: 16, paddingHorizontal: 20 },
+    hero: { borderRadius: 20, padding: 24, alignItems: 'center', marginBottom: 0 },
+    avatarWrap: { marginBottom: 12 },
+    avatar: { width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)' },
+    avatarText: { fontSize: 26, fontFamily: 'Inter_700Bold', color: '#fff' },
+    name: { fontSize: 22, fontFamily: 'Inter_700Bold', color: '#fff', marginBottom: 16 },
+    statsRow: { flexDirection: 'row', width: '100%', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 14, padding: 14 },
+    stat: { flex: 1, alignItems: 'center' },
+    statVal: { fontSize: 20, fontFamily: 'Inter_700Bold', color: '#fff' },
+    statLbl: { fontSize: 10, fontFamily: 'Inter_500Medium', color: 'rgba(255,255,255,0.7)', marginTop: 2 },
+    statDiv: { width: 1, backgroundColor: 'rgba(255,255,255,0.3)', marginHorizontal: 8 },
+    card: { backgroundColor: colors.card, borderRadius: 20, padding: 18, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
+    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+    cardTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.foreground },
+    cardSub: { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.mutedForeground, marginTop: 2 },
+    editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, backgroundColor: colors.muted },
+    editBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+    infoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+    infoLabel: { fontSize: 14, fontFamily: 'Inter_500Medium', color: colors.mutedForeground },
+    infoValue: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: colors.foreground },
+    infoEmpty: { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.border },
+    emptyContacts: { alignItems: 'center', gap: 10, paddingVertical: 20 },
+    emptyContactsText: { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.mutedForeground, textAlign: 'center', maxWidth: 260 },
+    contactCard: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+    contactIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+    contactName: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: colors.foreground },
+    contactMeta: { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.mutedForeground, marginTop: 2 },
+    settingRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 14 },
+    settingIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+    settingLabel: { flex: 1, fontSize: 15, fontFamily: 'Inter_500Medium', color: colors.foreground },
+    recipientChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.muted },
+    recipientChipText: { fontSize: 13, fontFamily: 'Inter_500Medium', color: colors.mutedForeground },
+    sendNowBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 12, marginTop: 16 },
+    sendNowBtnText: { color: '#fff', fontSize: 14, fontFamily: 'Inter_700Bold' },
+    reminderNote: { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.mutedForeground, marginTop: 8 },
+    saveBtn: { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 12, flexDirection: 'row', justifyContent: 'center', gap: 8 },
+    saveBtnText: { color: '#fff', fontSize: 15, fontFamily: 'Inter_700Bold' },
+  });
+}
