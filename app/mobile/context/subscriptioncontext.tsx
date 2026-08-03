@@ -1,13 +1,15 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { Linking } from 'react-native';
+import * as ExpoLinking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { cancelDailyReportReminder } from '@/utils/notifications';
 
 export const PREMIUM_ENTITLEMENT_ID = 'premium';
 const STORAGE_KEY = '@tracmeds:isPro';
 const SUBSCRIPTION_RECORD_KEY = '@tracmeds:subscriptionRecord';
-const RAZORPAY_RETURN_URL = 'tracmeds://payment/complete';
-const RAZORPAY_CANCEL_URL = 'tracmeds://payment/cancel';
+// Use the backend-hosted checkout route so the details form, Razorpay callback,
+// invoice email, and Google Sheets bookkeeping stay on the same controlled path.
+const CHECKOUT_BASE_URL = 'https://website-tracmeds-backend-on-render.onrender.com/checkout';
 
 // Expiry durations — client-side enforcement only.
 // NOTE: This is a one-time-charge setup (not recurring billing), so expiry is
@@ -98,10 +100,13 @@ function isExpired(expiresAt: string | null): boolean {
 
 function getCheckoutUrl(pkg: SubscriptionPackage) {
   const plan = pkg.identifier.toLowerCase();
-  const baseUrl = 'https://www.tracmeds.com';
+  const returnBaseUrl = ExpoLinking.createURL('payment/complete');
+  const cancelBaseUrl = ExpoLinking.createURL('payment/cancel');
+  const returnUrl = returnBaseUrl;
+  const cancelUrl = cancelBaseUrl;
   const cacheBuster = Date.now();
   const resolvedPlan = plan.includes('annual') ? 'annual' : 'monthly';
-  return `${baseUrl}?plan=${resolvedPlan}&return_url=${encodeURIComponent(RAZORPAY_RETURN_URL)}&cancel_url=${encodeURIComponent(RAZORPAY_CANCEL_URL)}&v=${cacheBuster}`;
+  return `${CHECKOUT_BASE_URL}?plan=${resolvedPlan}&return_url=${encodeURIComponent(returnUrl)}&cancel_url=${encodeURIComponent(cancelUrl)}&v=${cacheBuster}`;
 }
 
 async function saveSubscriptionRecord(pkg: SubscriptionPackage, status: SubscriptionRecord['status']): Promise<SubscriptionRecord> {
@@ -207,7 +212,17 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     const handleDeepLink = async (url: string | null) => {
       if (!url) return;
       const normalized = url.toLowerCase();
-      if (normalized.includes('success') || normalized.includes('paid')) {
+      let statusParam = '';
+      try {
+        statusParam = (new URL(url).searchParams.get('status') || '').toLowerCase();
+      } catch {
+        // Ignore parse failures and keep fallback checks below.
+      }
+
+      const isSuccess = normalized.includes('success') || normalized.includes('paid') || statusParam === 'success';
+      const isCancel = normalized.includes('cancel') || statusParam === 'cancel' || statusParam === 'failed';
+
+      if (isSuccess) {
         try {
           await AsyncStorage.setItem(STORAGE_KEY, 'true');
           // Determine which plan was purchased from deep-link params if possible;
@@ -238,7 +253,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         } catch {
           // Ignore persistence issues and keep UI state updated.
         }
-      } else if (normalized.includes('cancel')) {
+      } else if (isCancel) {
         try {
           await AsyncStorage.setItem(STORAGE_KEY, 'false');
           const storedRecord = await AsyncStorage.getItem(SUBSCRIPTION_RECORD_KEY);
@@ -258,6 +273,44 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     const subscription = Linking.addEventListener('url', ({ url }) => handleDeepLink(url));
     return () => subscription.remove();
   }, []);
+
+  // While the app is open, continuously enforce expiry so access is revoked
+  // as soon as the plan period lapses (without requiring app restart).
+  useEffect(() => {
+    if (!isPro || !expiresAt) return;
+
+    const enforceExpiryNow = async () => {
+      if (!isExpired(expiresAt)) return;
+      try {
+        const storedRecord = await AsyncStorage.getItem(SUBSCRIPTION_RECORD_KEY);
+        if (storedRecord) {
+          try {
+            const rec: SubscriptionRecord = JSON.parse(storedRecord);
+            const updated: SubscriptionRecord = {
+              ...rec,
+              status: 'expired',
+              updatedAt: new Date().toISOString(),
+            };
+            await AsyncStorage.setItem(SUBSCRIPTION_RECORD_KEY, JSON.stringify(updated));
+            reportSubscriptionEventToServer(updated, 'expired', false);
+          } catch {
+            // corrupted record — continue with revocation
+          }
+        }
+        await AsyncStorage.setItem(STORAGE_KEY, 'false');
+        await cancelDailyReportReminder();
+      } catch {
+        // best-effort persistence
+      } finally {
+        setIsPro(false);
+      }
+    };
+
+    // Run immediately and then poll at a low cadence.
+    enforceExpiryNow();
+    const intervalId = setInterval(enforceExpiryNow, 60 * 1000);
+    return () => clearInterval(intervalId);
+  }, [isPro, expiresAt]);
 
   const purchase = useCallback(async (pkg: SubscriptionPackage) => {
     const checkoutUrl = getCheckoutUrl(pkg);
