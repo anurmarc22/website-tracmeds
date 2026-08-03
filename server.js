@@ -232,6 +232,78 @@ async function appendTransactionToSheet(invoice) {
   }
 }
 
+// Append an arbitrary report/summary row to a separate sheet range
+async function ensureReportHeaderRow(sheets) {
+  const sheetName = (GOOGLE_SHEET_RANGE.split('!')[0] || 'Sheet1') + '_reports';
+  const headerRange = `${sheetName}!A1:Z1`;
+  try {
+    const response = await sheets.spreadsheets.values.get({ spreadsheetId: GOOGLE_SHEET_ID, range: headerRange });
+    const rows = response.data.values || [];
+    if (rows.length === 0 || rows[0].every((cell) => cell === '')) {
+      const headerRow = [
+        'Timestamp',
+        'User',
+        'From',
+        'To',
+        'Categories',
+        'Row Count',
+        'Summary',
+      ];
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: GOOGLE_SHEET_ID,
+        range: headerRange,
+        valueInputOption: 'RAW',
+        requestBody: { values: [headerRow] },
+      });
+    }
+  } catch (err) {
+    // ignore — sheet may not exist or client not configured
+  }
+}
+
+async function appendReportToSheet(report) {
+  const sheets = getSheetsClient();
+  if (!sheets) return { success: false, reason: 'missing_google_sheets_configuration' };
+  try {
+    await ensureReportHeaderRow(sheets);
+    const sheetName = (GOOGLE_SHEET_RANGE.split('!')[0] || 'Sheet1') + '_reports';
+    const values = [
+      new Date().toISOString(),
+      report.user || '',
+      report.from || '',
+      report.to || '',
+      (report.categories || []).join(','),
+      report.rowCount || 0,
+      report.summary || '',
+    ];
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `${sheetName}!A1:G1`,
+      valueInputOption: 'USER_ENTERED',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: { values: [values] },
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('Unable to append report to Google Sheet', error);
+    return { success: false, reason: 'google_sheets_error', error: error.message };
+  }
+}
+
+// POST endpoint to accept report data from the mobile app
+app.post('/api/append-report', async (req, res) => {
+  try {
+    const { user, from, to, categories, rowCount, summary } = req.body || {};
+    if (!categories || !Array.isArray(categories)) return res.status(400).json({ success: false, error: 'Invalid categories' });
+    const result = await appendReportToSheet({ user, from, to, categories, rowCount, summary });
+    if (!result.success) return res.status(500).json({ success: false, error: result.reason || 'append_failed' });
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('append-report error', err);
+    return res.status(500).json({ success: false, error: 'server_error' });
+  }
+});
+
 function sanitizeText(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -463,16 +535,14 @@ async function sendInvoiceEmail(invoice) {
   }
 }
 
-app.post('/api/create-order', async (req, res) => {
+async function handleCreateOrder(req, res) {
   try {
     const { amount, currency = 'INR', receipt = 'receipt#1', notes = {} } = req.body;
     const amountInt = parseInt(amount, 10);
     if (isNaN(amountInt) || amountInt < 100) {
       return res.status(400).json({ error: 'Invalid amount. Minimum is 100 paise.' });
     }
-
     const options = buildOrderOptions({ amount: amountInt, currency, receipt, notes });
-
     const order = await razor.orders.create(options);
     return res.json({ order_id: order.id, amount: order.amount, currency: order.currency });
   } catch (err) {
@@ -480,19 +550,17 @@ app.post('/api/create-order', async (req, res) => {
     console.error('Create order error', err);
     return res.status(500).json({ error: 'Unable to create order' });
   }
-});
+}
 
-app.post('/api/verify-payment', async (req, res) => {
+async function handleVerifyPayment(req, res) {
   const { razorpay_payment_id, razorpay_order_id, razorpay_signature, notes = {} } = req.body;
   if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
-
   const generated_signature = crypto
     .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || '')
     .update(razorpay_order_id + '|' + razorpay_payment_id)
     .digest('hex');
-
   if (generated_signature === razorpay_signature) {
     const invoice = buildInvoiceData({
       name: notes.name,
@@ -509,7 +577,6 @@ app.post('/api/verify-payment', async (req, res) => {
       orderId: razorpay_order_id,
       receipt: notes.receipt,
     });
-
     appendLedgerEntry(invoice);
     const sheetResult = await appendTransactionToSheet(invoice);
     if (!sheetResult.success) {
@@ -519,13 +586,21 @@ app.post('/api/verify-payment', async (req, res) => {
     return res.json({ success: true, invoice });
   }
   return res.status(400).json({ success: false, error: 'Signature mismatch' });
-});
+}
+
+// /api/checkout/* are aliases used by index.html; both paths share the same handler.
+app.post('/api/create-order', handleCreateOrder);
+app.post('/api/checkout/create-order', handleCreateOrder);
+
+app.post('/api/verify-payment', handleVerifyPayment);
+app.post('/api/checkout/verify-payment', handleVerifyPayment);
+
 
 app.post('/api/payment-callback', async (req, res) => {
   const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = req.body;
   const returnUrl = req.query.return_url || 'tracmeds://payment/complete';
   const cancelUrl = req.query.cancel_url || 'tracmeds://payment/cancel';
-  const checkoutPageUrl = 'https://www.tracmeds.com/razorpay/';
+  const checkoutPageUrl = 'https://www.tracmeds.com/';
 
   if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature) {
     return res.redirect(302, checkoutPageUrl + '?callback_status=failed&return_url=' + encodeURIComponent(returnUrl) + '&cancel_url=' + encodeURIComponent(cancelUrl));
@@ -577,6 +652,92 @@ app.post('/api/payment-callback', async (req, res) => {
   }
 
   return res.redirect(302, checkoutPageUrl + '?callback_status=success&return_url=' + encodeURIComponent(returnUrl) + '&cancel_url=' + encodeURIComponent(cancelUrl));
+});
+
+// Appends a subscription lifecycle event (active, renewed, expired) to the
+// reports sheet in Google Sheets. Client-initiated from the app (fire-and-forget).
+// NOTE: One-time-charge setup — not recurring billing. These events are for
+// bookkeeping visibility only; they do not grant or revoke server-side access.
+async function appendSubscriptionEventToSheet(event) {
+  const sheets = getSheetsClient();
+  if (!sheets) return { success: false, reason: 'missing_google_sheets_configuration' };
+  try {
+    const sheetName = (GOOGLE_SHEET_RANGE.split('!')[0] || 'Sheet1') + '_subscriptions';
+    const headerRange = `${sheetName}!A1:H1`;
+
+    // Ensure header row on first use.
+    try {
+      const existing = await sheets.spreadsheets.values.get({ spreadsheetId: GOOGLE_SHEET_ID, range: headerRange });
+      if (!existing.data.values || existing.data.values.length === 0) {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: GOOGLE_SHEET_ID,
+          range: headerRange,
+          valueInputOption: 'RAW',
+          requestBody: {
+            values: [['Timestamp', 'User', 'Plan', 'Status', 'Is Renewal', 'Purchased At', 'Expires At', 'Note']],
+          },
+        });
+      }
+    } catch { /* sheet may not exist yet — let append create it */ }
+
+    const note = event.status === 'active' && !event.isRenewal
+      ? 'New subscriber'
+      : event.status === 'renewed'
+      ? 'Renewal after prior expiry'
+      : event.status === 'expired'
+      ? 'Access lapsed (client-side expiry)'
+      : event.status;
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `${sheetName}!A1:H1`,
+      valueInputOption: 'USER_ENTERED',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: {
+        values: [[
+          new Date().toISOString(),
+          event.user || '',
+          event.plan || '',
+          event.status || '',
+          event.isRenewal ? 'Yes' : 'No',
+          event.purchasedAt || '',
+          event.expiresAt || '',
+          note,
+        ]],
+      },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Unable to append subscription event to Google Sheet', error);
+    return { success: false, reason: 'google_sheets_error', error: error.message };
+  }
+}
+
+// Single endpoint for all subscription lifecycle events: active, renewed, expired.
+// Replaces the earlier /api/subscription-expired route.
+app.post('/api/subscription-event', async (req, res) => {
+  try {
+    const { user, plan, purchasedAt, expiresAt, status, isRenewal } = req.body || {};
+    if (!plan || !status) return res.status(400).json({ success: false, error: 'Missing plan or status field' });
+
+    const result = await appendSubscriptionEventToSheet({ user, plan, purchasedAt, expiresAt, status, isRenewal });
+    if (!result.success) console.warn('Subscription event sheet append failed', result);
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('subscription-event error', err);
+    return res.status(500).json({ success: false, error: 'server_error' });
+  }
+});
+
+// Legacy alias kept so any existing clients using the old endpoint still work.
+app.post('/api/subscription-expired', async (req, res) => {
+  const { user, plan, purchasedAt, expiresAt } = req.body || {};
+  req.body = { user, plan, purchasedAt, expiresAt, status: 'expired', isRenewal: false };
+  const result = await appendSubscriptionEventToSheet(req.body);
+  if (!result.success) console.warn('Subscription expired sheet append failed', result);
+  return res.json({ success: true });
 });
 
 if (require.main === module) {
