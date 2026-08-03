@@ -1005,11 +1005,7 @@
         startAutoPlay();
       })();
 
-      const params = new URLSearchParams(window.location.search);
-      const plan = (params.get('plan') || 'monthly').toLowerCase();
-      const returnUrl = params.get('return_url') || 'tracmeds://payment/complete';
-      const cancelUrl = params.get('cancel_url') || 'tracmeds://payment/cancel';
-      const shouldAutoOpenCheckout = params.has('plan') || params.has('return_url') || params.has('cancel_url');
+const shouldAutoOpenCheckout = params.has('plan') || params.has('return_url') || params.has('cancel_url');
 
       if (window.location.pathname.includes('download.html') || window.location.pathname.endsWith('/download.html')) {
         const downloadButton = document.querySelector('.btn-primary');
