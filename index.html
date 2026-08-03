@@ -1021,10 +1021,17 @@
         }
       }
 
-      if (shouldAutoOpenCheckout) {
-        window.setTimeout(function() {
-          startCheckout();
-        }, 250);
-      }
+      const callbackStatus = params.get('callback_status');
+if (callbackStatus === 'success') {
+  // Returning from the server-side redirect fallback (e.g. Safari) — payment
+  // was already verified server-side. Hand off to the app via return_url.
+  window.location.href = `${returnUrl}?status=success`;
+} else if (callbackStatus === 'failed') {
+  window.location.href = `${cancelUrl}?error=${encodeURIComponent('Payment callback failed')}`;
+} else if (shouldAutoOpenCheckout) {
+  window.setTimeout(function() {
+    startCheckout();
+  }, 250);
+}
     </script>
 
