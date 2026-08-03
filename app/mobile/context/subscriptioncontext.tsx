@@ -71,7 +71,7 @@ interface SubscriptionContextValue {
   /** Days remaining in the current subscription period. Negative means expired, null means no subscription. */
   daysRemaining: number | null;
   purchase: (pkg: SubscriptionPackage) => Promise<{ success: boolean; pending?: boolean; error?: string }>;
-  restore: () => Promise<{ success: boolean; error?: string }>;
+  restore: (identity: { email?: string; phone?: string }) => Promise<{ success: boolean; error?: string }>;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextValue | undefined>(undefined);
@@ -331,8 +331,52 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     }
   }, []);
 
-  const restore = useCallback(async () => {
-    return { success: false, error: 'Restore is not available for Razorpay yet. Please contact support.' };
+  const restore = useCallback(async (identity: { email?: string; phone?: string }) => {
+    const email = String(identity?.email || '').trim().toLowerCase();
+    const phone = String(identity?.phone || '').trim();
+    if (!email && !phone) {
+      return { success: false, error: 'Enter email or phone to restore your plan.' };
+    }
+
+    try {
+      const resp = await fetch('https://website-tracmeds-backend-on-render.onrender.com/api/restore-subscription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, phone }),
+      });
+
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data?.success) {
+        return { success: false, error: data?.error || 'No active plan found for these details.' };
+      }
+
+      const restoredPlan = String(data.plan || '').toLowerCase().includes('annual') ? 'annual' : 'monthly';
+      const pkg = restoredPlan === 'annual' ? DEFAULT_PACKAGES[0] : DEFAULT_PACKAGES[1];
+      const startedAt = data.startedAt || new Date().toISOString();
+      const restoredExpiresAt = data.expiresAt || computeExpiresAt(pkg.identifier, new Date(startedAt));
+
+      const record: SubscriptionRecord = {
+        plan: pkg.identifier,
+        title: pkg.title,
+        priceString: pkg.priceString,
+        status: 'active',
+        startedAt,
+        expiresAt: restoredExpiresAt,
+        updatedAt: new Date().toISOString(),
+        supportNote: 'Family sharing access was restored from a prior verified purchase record.',
+      };
+
+      await Promise.all([
+        AsyncStorage.setItem(STORAGE_KEY, 'true'),
+        AsyncStorage.setItem(SUBSCRIPTION_RECORD_KEY, JSON.stringify(record)),
+      ]);
+
+      setIsPro(true);
+      setExpiresAt(restoredExpiresAt);
+      return { success: true };
+    } catch {
+      return { success: false, error: 'Restore failed. Please try again in a moment.' };
+    }
   }, []);
 
   const daysRemaining = computeDaysRemaining(expiresAt);
