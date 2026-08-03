@@ -544,7 +544,7 @@ async function handleCreateOrder(req, res) {
     }
     const options = buildOrderOptions({ amount: amountInt, currency, receipt, notes });
     const order = await razor.orders.create(options);
-    return res.json({ order_id: order.id, amount: order.amount, currency: order.currency });
+    return res.json({ order_id: order.id, amount: order.amount, currency: order.currency, key_id: process.env.RAZORPAY_KEY_ID });
   } catch (err) {
     if (err.statusCode === 401) return res.status(401).json({ error: 'Authentication with Razorpay failed.' });
     console.error('Create order error', err);
