@@ -289,7 +289,6 @@
 
   <script>
     const SERVER_BASE = 'https://website-tracmeds-backend-on-render.onrender.com';
-    const RAZORPAY_KEY_ID = 'rzp_test_TKnYyH9nXpdyV2';
     const MERCHANT_LOGO_URL = 'https://www.tracmeds.com/icon.png?v=2';
 
     const PLAN_DETAILS = {
@@ -419,9 +418,10 @@
         const order = await orderRes.json();
 
         if (!window.Razorpay) throw new Error('Payment page is still loading. Please try again in a moment.');
+        if (!order.key_id) throw new Error('Server did not return a Razorpay key. Check RAZORPAY_KEY_ID on the server.');
 
         const options = {
-          key: RAZORPAY_KEY_ID,
+          key: order.key_id,
           amount: order.amount,
           currency: order.currency,
           image: MERCHANT_LOGO_URL,
