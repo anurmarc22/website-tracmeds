@@ -200,26 +200,69 @@
 
     <div class="form-card">
       <h2>Invoice details</h2>
-      <div class="form-grid">
+      <form id="checkout-form" class="form-grid" novalidate>
         <div class="field">
           <label for="customer-name">Name</label>
-          <input id="customer-name" name="customer-name" type="text" autocomplete="name" placeholder="Your full name" />
+          <input id="customer-name" name="customer-name" type="text" autocomplete="name" placeholder="Your full name" required />
         </div>
         <div class="field">
           <label for="customer-phone">Phone number</label>
-          <input id="customer-phone" name="customer-phone" type="tel" autocomplete="tel" placeholder="10-digit phone" />
+          <input id="customer-phone" name="customer-phone" type="tel" autocomplete="tel" placeholder="10-digit phone" inputmode="numeric" required />
         </div>
         <div class="field">
           <label for="customer-email">Email</label>
-          <input id="customer-email" name="customer-email" type="email" autocomplete="email" placeholder="you@example.com" />
+          <input id="customer-email" name="customer-email" type="email" autocomplete="email" placeholder="you@example.com" required />
         </div>
         <div class="field">
           <label for="customer-address">Billing address</label>
-          <textarea id="customer-address" name="customer-address" placeholder="Street, city, state, PIN code"></textarea>
+          <textarea id="customer-address" name="customer-address" placeholder="Street, city, state, PIN code" required></textarea>
         </div>
         <div class="field">
-          <label for="customer-state">Place of supply (State or Outside India)</label>
-          <input id="customer-state" name="customer-state" type="text" placeholder="e.g. New Delhi, Karnataka, Maharashtra, or Outside India" />
+          <label for="customer-state">Place of supply</label>
+          <select id="customer-state" name="customer-state" required>
+            <option value="" disabled selected>Select state or Outside India</option>
+            <option value="Outside India">Outside India</option>
+            <optgroup label="India — States">
+              <option value="Andhra Pradesh">Andhra Pradesh</option>
+              <option value="Arunachal Pradesh">Arunachal Pradesh</option>
+              <option value="Assam">Assam</option>
+              <option value="Bihar">Bihar</option>
+              <option value="Chhattisgarh">Chhattisgarh</option>
+              <option value="Goa">Goa</option>
+              <option value="Gujarat">Gujarat</option>
+              <option value="Haryana">Haryana</option>
+              <option value="Himachal Pradesh">Himachal Pradesh</option>
+              <option value="Jharkhand">Jharkhand</option>
+              <option value="Karnataka">Karnataka</option>
+              <option value="Kerala">Kerala</option>
+              <option value="Madhya Pradesh">Madhya Pradesh</option>
+              <option value="Maharashtra">Maharashtra</option>
+              <option value="Manipur">Manipur</option>
+              <option value="Meghalaya">Meghalaya</option>
+              <option value="Mizoram">Mizoram</option>
+              <option value="Nagaland">Nagaland</option>
+              <option value="Odisha">Odisha</option>
+              <option value="Punjab">Punjab</option>
+              <option value="Rajasthan">Rajasthan</option>
+              <option value="Sikkim">Sikkim</option>
+              <option value="Tamil Nadu">Tamil Nadu</option>
+              <option value="Telangana">Telangana</option>
+              <option value="Tripura">Tripura</option>
+              <option value="Uttar Pradesh">Uttar Pradesh</option>
+              <option value="Uttarakhand">Uttarakhand</option>
+              <option value="West Bengal">West Bengal</option>
+            </optgroup>
+            <optgroup label="India — Union Territories">
+              <option value="Andaman and Nicobar Islands">Andaman and Nicobar Islands</option>
+              <option value="Chandigarh">Chandigarh</option>
+              <option value="Dadra and Nagar Haveli and Daman and Diu">Dadra and Nagar Haveli and Daman and Diu</option>
+              <option value="Delhi">Delhi</option>
+              <option value="Jammu and Kashmir">Jammu and Kashmir</option>
+              <option value="Ladakh">Ladakh</option>
+              <option value="Lakshadweep">Lakshadweep</option>
+              <option value="Puducherry">Puducherry</option>
+            </optgroup>
+          </select>
         </div>
         <div class="toggle-row">
           <label for="gst-required">I need a GST invoice</label>
@@ -229,7 +272,7 @@
           <label for="customer-gstin">GSTIN</label>
           <input id="customer-gstin" name="customer-gstin" type="text" placeholder="22AAAAA0000A1Z5" />
         </div>
-      </div>
+      </form>
       <div class="hint">If you request a GST invoice, we will use these details to issue it and keep the transaction record for bookkeeping and compliance.</div>
     </div>
 
@@ -308,9 +351,31 @@
     const gstinFieldEl = document.getElementById('gstin-field');
     const customerGstinEl = document.getElementById('customer-gstin');
 
+    const checkoutForm = document.getElementById('checkout-form');
+
     gstRequiredEl.addEventListener('change', function () {
-      gstinFieldEl.style.display = gstRequiredEl.checked ? 'block' : 'none';
+      const needsGstin = gstRequiredEl.checked;
+      gstinFieldEl.style.display = needsGstin ? 'block' : 'none';
+      customerGstinEl.required = needsGstin;
+      if (!needsGstin) customerGstinEl.setCustomValidity('');
     });
+
+    // Loose phone check: strip everything but digits and require at least 10.
+    // Doesn't force a specific format so +91 prefixes, spaces, or dashes
+    // still work — normalizePhone() on the server does the same stripping.
+    customerPhoneEl.addEventListener('input', function () {
+      const digits = customerPhoneEl.value.replace(/\D/g, '');
+      customerPhoneEl.setCustomValidity(digits.length >= 10 ? '' : 'Enter at least a 10-digit phone number.');
+    });
+
+    function validateForm() {
+      customerPhoneEl.dispatchEvent(new Event('input'));
+      if (!checkoutForm.reportValidity()) {
+        setStatus('Please fill in all the required invoice details above.', true);
+        return false;
+      }
+      return true;
+    }
 
     function setStatus(message, isError) {
       statusEl.textContent = message || '';
@@ -323,6 +388,8 @@
     }
 
     payButton.addEventListener('click', async function () {
+      if (!validateForm()) return;
+
       payButton.disabled = true;
       payButton.textContent = 'Opening secure checkout…';
       setStatus('');
