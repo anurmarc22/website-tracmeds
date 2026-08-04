@@ -195,7 +195,7 @@
     <div class="plan-box">
       <div class="plan-name" id="plan-name">Monthly plan</div>
       <div class="plan-price" id="plan-price">₹149<span>/month</span></div>
-      <div class="plan-summary" id="plan-summary">Customer pays ₹149.00 incl. GST and payment processing charges. Estimated payout to you: ₹145.48.</div>
+      <div class="plan-summary" id="plan-summary">Billed securely via Razorpay. Includes applicable GST.</div>
     </div>
 
     <div class="form-card">
@@ -272,21 +272,12 @@
     const planNameEl = document.getElementById('plan-name');
     const planPriceEl = document.getElementById('plan-price');
 
-    function estimatePayout(amountInPaise) {
-      const grossAmount = amountInPaise / 100;
-      const feeBeforeGst = grossAmount * 0.02;
-      const fee = feeBeforeGst + (feeBeforeGst * 0.18);
-      const netPayout = grossAmount - fee;
-      return { grossAmount, fee, netPayout };
-    }
-
     function selectPlan(newPlan) {
       plan = newPlan;
       const info = PLAN_DETAILS[plan];
-      const payout = estimatePayout(info.amount);
       planNameEl.textContent = info.label;
       planPriceEl.innerHTML = info.priceHtml;
-      document.getElementById('plan-summary').innerHTML = `Customer pays ₹${payout.grossAmount.toFixed(2)} incl. GST and payment processing charges. Estimated payout to you: ₹${payout.netPayout.toFixed(2)}.`;
+      document.getElementById('plan-summary').innerHTML = `Billed securely via Razorpay. Includes applicable GST.`;
       optionMonthly.classList.toggle('selected', plan === 'monthly');
       optionAnnual.classList.toggle('selected', plan === 'annual');
     }
