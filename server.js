@@ -8,12 +8,24 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const { Resend } = require('resend');
 const { google } = require('googleapis');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname));
+
+const restoreRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: 'Too many restore attempts. Please try again shortly.',
+  },
+});
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
@@ -137,6 +149,75 @@ function normalizePhone(phone) {
 function getPlanDurationDays(plan) {
   const raw = String(plan || '').toLowerCase();
   return raw.includes('annual') ? 365 : 30;
+}
+
+async function findLedgerEntryInSheet(email, phone) {
+  const sheets = getSheetsClient();
+  if (!sheets) return null;
+
+  const wantedEmail = normalizeEmail(email);
+  const wantedPhone = normalizePhone(phone);
+
+  if (!wantedEmail || !wantedPhone) return null;
+
+  const sheetName = (GOOGLE_SHEET_RANGE.split('!')[0] || 'Sheet1');
+  const lookupRange = `${sheetName}!A:Z`;
+
+  try {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: lookupRange,
+    });
+
+    const rows = response.data.values || [];
+    if (!rows.length) return null;
+
+    const header = rows[0] || [];
+    const headerMap = new Map();
+    header.forEach((col, index) => {
+      const key = String(col || '').trim().toLowerCase();
+      if (key) headerMap.set(key, index);
+    });
+
+    const emailIndex = headerMap.get('customer email');
+    const phoneIndex = headerMap.get('customer phone');
+    const timestampIndex = headerMap.get('timestamp');
+    const planIndex = headerMap.get('plan');
+    const invoiceIndex = headerMap.get('invoice number');
+    const paymentIdIndex = headerMap.get('payment id');
+    const customerNameIndex = headerMap.get('customer name');
+
+    if (emailIndex === undefined || phoneIndex === undefined) {
+      return null;
+    }
+
+    const matches = [];
+
+    for (let i = 1; i < rows.length; i += 1) {
+      const row = rows[i] || [];
+      const rowEmail = normalizeEmail(row[emailIndex] || '');
+      const rowPhone = normalizePhone(row[phoneIndex] || '');
+
+      if (!rowEmail || !rowPhone) continue;
+      if (rowEmail !== wantedEmail || rowPhone !== wantedPhone) continue;
+
+      matches.push({
+        timestamp: row[timestampIndex] || '',
+        plan: row[planIndex] || '',
+        invoiceNumber: row[invoiceIndex] || '',
+        paymentId: row[paymentIdIndex] || '',
+        customerName: row[customerNameIndex] || '',
+      });
+    }
+
+    if (!matches.length) return null;
+
+    matches.sort((a, b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')));
+    return matches[0];
+  } catch (error) {
+    console.warn('restore lookup from sheet failed', error);
+    return null;
+  }
 }
 
 function getSheetsClient() {
@@ -774,34 +855,21 @@ app.post('/api/subscription-expired', async (req, res) => {
 // Restore endpoint for website-APK users who reinstall, clear data, or move devices.
 // Matches by email/phone against successful payment ledger entries and restores if
 // the latest matching purchase is still within its plan period.
-app.post('/api/restore-subscription', async (req, res) => {
+app.post('/api/restore-subscription', restoreRateLimiter, async (req, res) => {
   try {
     const email = normalizeEmail(req.body?.email);
     const phone = normalizePhone(req.body?.phone);
-    if (!email && !phone) {
-      return res.status(400).json({ success: false, error: 'Provide email or phone to restore.' });
+
+    if (!email || !phone) {
+      return res.status(400).json({ success: false, error: 'Both email and phone are required.' });
     }
 
-    const entries = getLedgerEntries();
-    const matches = entries.filter((entry) => {
-      const entryEmail = normalizeEmail(entry.customerEmail);
-      const entryPhone = normalizePhone(entry.customerPhone);
-      const emailMatch = email ? entryEmail === email : false;
-      const phoneMatch = phone ? entryPhone === phone : false;
-      return emailMatch || phoneMatch;
-    });
+    const latest = await findLedgerEntryInSheet(email, phone);
 
-    if (matches.length === 0) {
-      return res.status(404).json({ success: false, error: 'No purchase found for these details.' });
+    if (!latest) {
+      return res.status(404).json({ success: false, error: 'No matching purchase found for these details.' });
     }
 
-    matches.sort((a, b) => {
-      const ta = new Date(a.timestamp || 0).getTime();
-      const tb = new Date(b.timestamp || 0).getTime();
-      return tb - ta;
-    });
-
-    const latest = matches[0];
     const plan = String(latest.plan || 'monthly').toLowerCase();
     const startedAt = latest.timestamp ? new Date(latest.timestamp) : new Date();
     const expiresAt = new Date(startedAt.getTime() + getPlanDurationDays(plan) * 24 * 60 * 60 * 1000);
@@ -824,6 +892,8 @@ app.post('/api/restore-subscription', async (req, res) => {
       startedAt: startedAt.toISOString(),
       expiresAt: expiresAt.toISOString(),
       customerName: latest.customerName || '',
+      invoiceNumber: latest.invoiceNumber || '',
+      paymentId: latest.paymentId || '',
     });
   } catch (err) {
     console.error('restore-subscription error', err);
