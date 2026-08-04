@@ -460,16 +460,39 @@ function buildInvoiceData({ name, phone, email, address, gstRequired, gstin, amo
   const amountInRupees = parseInt(amount, 10) / 100;
   const exportSupply = isExportSupply(normalizedPlace);
   const intraState = !exportSupply && normalizedPlace.toLowerCase().includes('mahar');
-  const taxableValueNum = exportSupply ? amountInRupees : Number((amountInRupees / 1.18).toFixed(2));
-  const taxTotalNum = exportSupply ? 0 : Number((amountInRupees - taxableValueNum).toFixed(2));
-  const cgstAmountNum = exportSupply ? 0 : intraState ? Number((taxTotalNum / 2).toFixed(2)) : 0;
-  const sgstAmountNum = exportSupply ? 0 : intraState ? Number((taxTotalNum / 2).toFixed(2)) : 0;
-  const igstAmountNum = exportSupply ? 0 : intraState ? 0 : Number(taxTotalNum.toFixed(2));
+
+  // Three-path mode: an "Outside India" place of supply always produces the
+  // export invoice — it overrides gstRequired entirely, since export sales
+  // are zero-rated under LUT regardless of whether the customer ticked the
+  // GST box. Otherwise it's a normal domestic GST invoice (CGST+SGST for
+  // Maharashtra, IGST elsewhere) or, if gstRequired is false, a plain
+  // no-GST payment receipt with no tax breakup at all.
+  // gstRequired alone isn't enough — if the box was checked but no GSTIN
+  // actually came through (e.g. a direct API call bypassing the frontend's
+  // conditional-required field), fall back to the plain receipt rather than
+  // emailing a "GST invoice" with GSTIN: N/A on it.
+  const gstApplies = !exportSupply && Boolean(gstRequired) && Boolean(sanitizeText(gstin));
+  const invoiceMode = exportSupply ? 'export' : gstApplies ? 'gst' : 'no-gst';
+
+  const taxableValueNum = gstApplies ? Number((amountInRupees / 1.18).toFixed(2)) : amountInRupees;
+  const taxTotalNum = gstApplies ? Number((amountInRupees - taxableValueNum).toFixed(2)) : 0;
+  const cgstAmountNum = gstApplies && intraState ? Number((taxTotalNum / 2).toFixed(2)) : 0;
+  const sgstAmountNum = gstApplies && intraState ? Number((taxTotalNum / 2).toFixed(2)) : 0;
+  const igstAmountNum = gstApplies && !intraState ? Number(taxTotalNum.toFixed(2)) : 0;
   const payoutEstimate = calculatePayoutEstimate({ amount });
   const invoiceNumber = getNextInvoiceNumber('TRACMEDS', new Date().getFullYear());
 
+  const isAnnual = String(plan || '').toLowerCase().includes('annual');
+  const planLabel = isAnnual ? 'Annual' : 'Monthly';
+  const planPriceDisplay = `₹${Math.round(amountInRupees)}`;
+
+  const description = exportSupply
+    ? (isAnnual ? 'Family unlock access - TracMeds annual subscription' : 'Family unlock access - TracMeds app subscription')
+    : (isAnnual ? 'Annual premium access / subscription for the TracMeds app service' : 'Premium access / subscription for the TracMeds app service');
+
   return {
     invoiceNumber,
+    invoiceMode,
     customerName: sanitizeText(name),
     customerPhone: sanitizeText(phone),
     customerEmail: sanitizeText(email),
@@ -477,6 +500,9 @@ function buildInvoiceData({ name, phone, email, address, gstRequired, gstin, amo
     gstRequired: Boolean(gstRequired),
     gstin: sanitizeText(gstin),
     plan: sanitizeText(plan),
+    planLabel,
+    planPriceDisplay,
+    description,
     paymentId: sanitizeText(paymentId),
     orderId: sanitizeText(orderId),
     receipt: sanitizeText(receipt),
@@ -494,9 +520,9 @@ function buildInvoiceData({ name, phone, email, address, gstRequired, gstin, amo
     igstAmountNum,
     gstBreakup: exportSupply
       ? 'Export under Letter of Undertaking without payment of Integrated Tax'
-      : intraState
-      ? 'CGST 9% + SGST 9%'
-      : 'IGST 18%',
+      : gstApplies
+      ? (intraState ? 'CGST 9% + SGST 9% (Maharashtra)' : 'IGST 18%')
+      : '',
     serviceAccountingCode: '998319',
     placeOfSupply: normalizedPlace,
     exportSupply,
@@ -522,94 +548,234 @@ function buildInvoiceData({ name, phone, email, address, gstRequired, gstin, amo
 }
 
 function buildInvoiceEmailHtml(invoice) {
-  const isExportInvoice = Boolean(invoice.exportSupply);
-  const gstInvoiceLabel = isExportInvoice ? 'Invoice' : invoice.gstRequired ? 'GST Invoice' : 'Invoice';
-  const gstInvoiceHint = isExportInvoice
-    ? `<p style="margin: 6px 0 0; color: #5c6785;">${invoice.exportNote}</p>`
-    : invoice.gstRequired
-    ? '<p style="margin: 6px 0 0; color: #5c6785;">This is a GST-compliant invoice issued for the paid subscription service.</p>'
-    : '<p style="margin: 6px 0 0; color: #5c6785;">This invoice is issued for payment received for the TracMeds app service.</p>';
+  // invoiceMode is set by buildInvoiceData: 'export' | 'gst' | 'no-gst'.
+  const mode = invoice.invoiceMode || (invoice.exportSupply ? 'export' : invoice.gstRequired ? 'gst' : 'no-gst');
+  const isReceipt = mode === 'no-gst';
+  const isExport = mode === 'export';
+  const isGst = mode === 'gst';
 
-  return `
-    <div style="font-family: Arial, sans-serif; color: #12193a; max-width: 720px; margin: 0 auto; padding: 24px; border: 1px solid #e5e7eb; border-radius: 12px; background: #ffffff;">
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #e5e7eb;">
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <img src="https://www.tracmeds.com/icon.png" alt="TracMeds" style="width: 48px; height: 48px; border-radius: 12px;" />
-          <div>
-            <h1 style="margin: 0 0 4px; font-size: 28px;">TracMeds</h1>
-            <p style="margin: 0; color: #5c6785;">Tax ${gstInvoiceLabel}</p>
-          </div>
-        </div>
-        <div style="text-align: right; min-width: 220px;">
-          <p style="margin: 0 0 4px; font-weight: 700;">Invoice Details</p>
-          <p style="margin: 0;">Invoice No: <strong>${invoice.invoiceNumber}</strong></p>
-          <p style="margin: 0;">Date: ${new Date(invoice.issuedAt).toLocaleDateString('en-IN')}</p>
-        </div>
-      </div>
+  const headerTagline = isGst ? 'Tax GST Invoice' : isExport ? 'Tax Invoice' : 'Payment Receipt';
+  const detailsLabel = isReceipt ? 'Receipt Details' : 'Invoice Details';
+  const numberLabel = isReceipt ? 'Receipt No' : 'Invoice No';
+  const dateDisplay = new Date(invoice.issuedAt).toLocaleDateString('en-IN');
 
-      <div style="display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; margin-bottom: 16px;">
-        <div style="flex: 1; min-width: 280px;">
-          <p style="margin: 0 0 6px; font-weight: 700;">Issued By</p>
-          <p style="margin: 0;">Anurag Sinha</p>
-          <p style="margin: 0;">2G 505, Indiabulls Greens, Lavender, Sector-2, Kon, Raigad, Maharashtra - 410221</p>
-          <p style="margin: 0;">GSTIN: 27BIQPS9199K1ZW</p>
-          <p style="margin: 0;">Email: support@tracmeds.com</p>
-          <p style="margin: 0;">Website: https://www.tracmeds.com</p>
-        </div>
-        <div style="flex: 1; min-width: 280px;">
-          <p style="margin: 0 0 6px; font-weight: 700;">Bill To</p>
-          <p style="margin: 0;">${invoice.customerName || 'Customer'}</p>
-          <p style="margin: 0;">${invoice.customerEmail || 'N/A'}</p>
-          <p style="margin: 0;">${invoice.customerPhone || 'N/A'}</p>
-          <p style="margin: 0;">${invoice.customerAddress || 'N/A'}</p>
-          ${invoice.gstRequired ? `<p style="margin: 0;">GSTIN: ${invoice.gstin || 'N/A'}</p>` : ''}
-        </div>
-      </div>
+  const billToLabel = isReceipt ? 'Received From' : 'Bill To';
+  const billToAddressLine = isReceipt
+    ? ''
+    : `<p style="margin:0; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">${invoice.customerAddress || 'N/A'}</p>`;
+  const billToGstinLine = isGst
+    ? `<p style="margin:0; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">GSTIN: ${invoice.gstin || 'N/A'}</p>`
+    : '';
 
-      <div style="display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; margin-bottom: 16px; padding: 12px 14px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fcfcfe;">
-        <div>
-          <p style="margin: 0 0 4px; font-weight: 700;">Place of Supply</p>
-          <p style="margin: 0;">${invoice.placeOfSupply || 'Maharashtra'}</p>
-        </div>
-        <div>
-          <p style="margin: 0 0 4px; font-weight: 700;">Payment Ref.</p>
-          <p style="margin: 0;">${invoice.paymentId || 'N/A'}</p>
-        </div>
-        <div>
-          <p style="margin: 0 0 4px; font-weight: 700;">Order Ref.</p>
-          <p style="margin: 0;">${invoice.orderId || 'N/A'}</p>
-        </div>
-      </div>
+  // Place of Supply / Payment Ref / Order Ref strip — no-GST receipts drop
+  // the Place of Supply cell since it isn't relevant to a plain receipt.
+  const placeOfSupplyCell = isReceipt
+    ? ''
+    : `<td valign="top" style="padding:0 18px 0 0;">
+              <p style="margin:0 0 4px 0; font-weight:700; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">Place of Supply</p>
+              <p style="margin:0; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">${invoice.placeOfSupply}</p>
+            </td>`;
 
-      <div style="border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; margin-bottom: 16px;">
-        <div style="background: #f7f8fd; padding: 12px 14px; font-weight: 700;">Description</div>
-        <div style="padding: 14px;">Premium access / subscription for the TracMeds app service</div>
-      </div>
+  const refBlock = `
+      <tr>
+        <td style="padding-bottom:16px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e5e7eb; border-radius:10px; background:#fcfcfe;">
+            <tr>
+              <td style="padding:12px 14px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+                  ${placeOfSupplyCell}<td valign="top" style="padding:0 18px 0 0;">
+              <p style="margin:0 0 4px 0; font-weight:700; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">Payment Ref.</p>
+              <p style="margin:0; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">${invoice.paymentId || 'N/A'}</p>
+            </td><td valign="top" style="padding:0 18px 0 0;">
+              <p style="margin:0 0 4px 0; font-weight:700; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">Order Ref.</p>
+              <p style="margin:0; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">${invoice.orderId || 'N/A'}</p>
+            </td>
+                </tr></table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>`;
 
-      <div style="border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; margin-bottom: 16px;">
-        <div style="background: #f7f8fd; padding: 12px 14px; font-weight: 700;">Sales Breakup</div>
-        <div style="padding: 14px;">
-          <p style="margin: 0 0 6px;">Taxable Value: ${invoice.taxableValue}</p>
-          ${invoice.exportSupply ? `<p style="margin: 0 0 6px;">${invoice.exportNote}</p>` : `
-            <p style="margin: 0 0 6px;">GST Breakup: ${invoice.gstBreakup}</p>
-            ${invoice.cgstAmount !== '₹0.00' ? `<p style="margin: 0 0 6px;">CGST: ${invoice.cgstAmount}</p>` : ''}
-            ${invoice.sgstAmount !== '₹0.00' ? `<p style="margin: 0 0 6px;">SGST: ${invoice.sgstAmount}</p>` : ''}
-            ${invoice.igstAmount !== '₹0.00' ? `<p style="margin: 0 0 6px;">IGST: ${invoice.igstAmount}</p>` : ''}
-            <p style="margin: 0 0 6px;">Total Tax: ${invoice.taxTotal}</p>
-          `}
-          <p style="margin: 0 0 6px;">SAC: ${invoice.serviceAccountingCode}</p>
-          <p style="margin: 0;">Place of Supply: ${invoice.placeOfSupply}</p>
-        </div>
-      </div>
+  // Sales Breakup — omitted entirely for no-GST receipts (the whole point of
+  // unchecking the GST box is to skip the tax breakup and show a plain
+  // amount paid instead).
+  let salesBreakupBlock = '';
+  if (isExport) {
+    salesBreakupBlock = `
+      <tr>
+        <td style="padding-bottom:16px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e5e7eb; border-radius:10px;">
+            <tr>
+              <td style="background:#f7f8fd; padding:12px 14px; font-weight:700; font-family:Arial, sans-serif; color:#12193a; font-size:14px; border-radius:10px 10px 0 0;">Sales Breakup</td>
+            </tr>
+            <tr>
+              <td style="padding:14px;">
+                <p style="margin:0 0 6px 0; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">Taxable Value: ${invoice.taxableValue}</p>
+                <p style="margin:0; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">${invoice.exportNote}</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>`;
+  } else if (isGst) {
+    const intraState = invoice.cgstAmountNum > 0;
+    const taxLines = intraState
+      ? `<p style="margin:0 0 6px 0; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">CGST: ${invoice.cgstAmount}</p>
+                <p style="margin:0 0 6px 0; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">SGST: ${invoice.sgstAmount}</p>`
+      : `<p style="margin:0 0 6px 0; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">IGST: ${invoice.igstAmount}</p>`;
+    const footnote = intraState
+      ? `<p style="margin:12px 0 0 0; color:#5c6785; font-size:12px; line-height:1.5; font-family:Arial, sans-serif;">For customers outside Maharashtra (within India) or outside India, the invoice will show IGST 18% instead of CGST + SGST.</p>`
+      : '';
+    salesBreakupBlock = `
+      <tr>
+        <td style="padding-bottom:16px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e5e7eb; border-radius:10px;">
+            <tr>
+              <td style="background:#f7f8fd; padding:12px 14px; font-weight:700; font-family:Arial, sans-serif; color:#12193a; font-size:14px; border-radius:10px 10px 0 0;">Sales Breakup</td>
+            </tr>
+            <tr>
+              <td style="padding:14px;">
+                <p style="margin:0 0 6px 0; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">Taxable Value: ${invoice.taxableValue}</p>
+                <p style="margin:0 0 6px 0; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">GST Breakup: ${invoice.gstBreakup}</p>
+                ${taxLines}
+                <p style="margin:0 0 6px 0; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">Total Tax: ${invoice.taxTotal}</p>
+                <p style="margin:0 0 6px 0; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">SAC: ${invoice.serviceAccountingCode}</p>
+                ${footnote}
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>`;
+  }
 
-      <div style="text-align: right; margin-bottom: 20px;">
-        <p style="margin: 0; font-size: 18px; font-weight: 700;">Total Amount: ${invoice.totalAmount} INR</p>
-      </div>
+  const totalBlock = isReceipt
+    ? `
+              <tr>
+                <td align="right" style="padding-bottom:20px;">
+                  <p style="margin:0; font-size:18px; font-weight:700; font-family:Arial, sans-serif; color:#12193a;">Amount Paid: ${invoice.totalAmount} INR</p>
+                  <p style="margin:4px 0 0 0; color:#5c6785; font-size:12px; font-family:Arial, sans-serif;">Inclusive of applicable GST, where chargeable.</p>
+                </td>
+              </tr>`
+    : `
+              <tr>
+                <td align="right" style="padding-bottom:20px;">
+                  <p style="margin:0; font-size:18px; font-weight:700; font-family:Arial, sans-serif; color:#12193a;">Total Amount: ${invoice.totalAmount} INR</p>
+                </td>
+              </tr>`;
 
-      ${gstInvoiceHint}
-      <p style="margin: 12px 0 0; color: #5c6785; font-size: 12px; line-height: 1.4;">TracMeds is a health-tracking service, not a medical device or substitute for professional medical advice.</p>
-    </div>
-  `;
+  const footerNote = isExport
+    ? 'This is an export of service under LUT without payment of integrated tax.'
+    : isGst
+    ? 'This is a GST-compliant invoice issued for the paid subscription service.'
+    : 'This is a payment receipt issued for the paid subscription service and is not a GST tax invoice.';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TracMeds Invoice</title>
+</head>
+<body style="margin:0; padding:24px; background:#f3f4f6;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:720px; margin:0 auto; border-collapse:collapse;">
+  <tr>
+    <td style="border:1px solid #e5e7eb; border-radius:12px; background:#ffffff;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td style="padding:24px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+
+              <!-- Header -->
+              <tr>
+                <td style="border-bottom:1px solid #e5e7eb; padding-bottom:12px; margin-bottom:16px;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td valign="middle" width="60%">
+                        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+                          <td valign="middle" style="padding-right:12px;">
+                            <img src="https://www.tracmeds.com/icon.png" width="48" height="48" alt="TracMeds" style="display:block; width:48px; height:48px; border-radius:12px;" />
+                          </td>
+                          <td valign="middle">
+                            <p style="margin:0 0 4px 0; font-family:Arial, sans-serif; font-size:26px; font-weight:700; color:#12193a;">TracMeds</p>
+                            <p style="margin:0; font-family:Arial, sans-serif; color:#5c6785; font-size:14px;">${headerTagline}</p>
+                          </td>
+                        </tr></table>
+                      </td>
+                      <td valign="top" align="right" width="40%">
+                        <p style="margin:0 0 4px 0; font-weight:700; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">${detailsLabel}</p>
+                        <p style="margin:0; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">${numberLabel}: <strong>${invoice.invoiceNumber}</strong></p>
+                        <p style="margin:0; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">Date: ${dateDisplay}</p>
+                        <p style="margin:0; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">Plan: ${invoice.planLabel} ${invoice.planPriceDisplay}</p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              <tr><td style="line-height:16px; font-size:16px;">&nbsp;</td></tr>
+
+              <!-- Issued By / Bill To -->
+              <tr>
+                <td style="padding-bottom:16px;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td valign="top" width="50%" style="padding-right:16px;">
+                        <p style="margin:0 0 6px 0; font-weight:700; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">Issued By</p>
+                        <p style="margin:0; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">${invoice.sellerName}</p>
+                        <p style="margin:0; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">${invoice.sellerAddress}</p>
+                        <p style="margin:0; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">GSTIN: ${invoice.sellerGstin}</p>
+                        <p style="margin:0; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">Email: ${invoice.sellerEmail}</p>
+                        <p style="margin:0; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">Website: ${invoice.sellerWebsite}</p>
+                      </td>
+                      <td valign="top" width="50%">
+                        <p style="margin:0 0 6px 0; font-weight:700; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">${billToLabel}</p>
+        <p style="margin:0; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">${invoice.customerName || 'Customer'}</p>
+        <p style="margin:0; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">${invoice.customerEmail || 'N/A'}</p>
+        <p style="margin:0; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">${invoice.customerPhone || 'N/A'}</p>
+        ${billToAddressLine}
+        ${billToGstinLine}
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              ${refBlock}
+              ${salesBreakupBlock}
+
+              <!-- Description -->
+              <tr>
+                <td style="padding-bottom:16px;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e5e7eb; border-radius:10px;">
+                    <tr>
+                      <td style="background:#f7f8fd; padding:12px 14px; font-weight:700; font-family:Arial, sans-serif; color:#12193a; font-size:14px; border-radius:10px 10px 0 0;">Description</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:14px; font-family:Arial, sans-serif; color:#12193a; font-size:14px;">${invoice.description}</td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- Total -->
+              ${totalBlock}
+
+              <!-- Footer -->
+              <tr>
+                <td>
+                  <p style="margin:6px 0 0 0; color:#5c6785; font-family:Arial, sans-serif; font-size:14px;">${footerNote}</p>
+                  <p style="margin:12px 0 0 0; color:#5c6785; font-size:12px; line-height:1.4; font-family:Arial, sans-serif;">TracMeds is a health-tracking service, not a medical device or substitute for professional medical advice.</p>
+                </td>
+              </tr>
+
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>`;
 }
 
 async function sendInvoiceEmail(invoice) {
@@ -644,12 +810,31 @@ async function sendInvoiceEmail(invoice) {
   }
 }
 
+// Fields required to build and email an invoice. Enforced here, before an
+// order is even created, so incomplete checkout data can't reach Razorpay —
+// this is a server-side backstop for the same validation the checkout page
+// does client-side, in case that's ever bypassed (direct API call, JS
+// disabled, etc).
+function findMissingInvoiceFields(notes = {}) {
+  const missing = [];
+  if (!sanitizeText(notes.name)) missing.push('name');
+  if (!sanitizeText(notes.email)) missing.push('email');
+  if (!sanitizeText(notes.phone)) missing.push('phone');
+  if (!sanitizeText(notes.place_of_supply)) missing.push('place_of_supply');
+  if (notes.gst_required === 'yes' && !sanitizeText(notes.gstin)) missing.push('gstin');
+  return missing;
+}
+
 async function handleCreateOrder(req, res) {
   try {
     const { amount, currency = 'INR', receipt = 'receipt#1', notes = {} } = req.body;
     const amountInt = parseInt(amount, 10);
     if (isNaN(amountInt) || amountInt < 100) {
       return res.status(400).json({ error: 'Invalid amount. Minimum is 100 paise.' });
+    }
+    const missingFields = findMissingInvoiceFields(notes);
+    if (missingFields.length > 0) {
+      return res.status(400).json({ error: `Missing required invoice details: ${missingFields.join(', ')}` });
     }
     const options = buildOrderOptions({ amount: amountInt, currency, receipt, notes });
     const order = await razor.orders.create(options);
