@@ -46,6 +46,7 @@ const GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY = process.env.GOOGLE_SERVICE_ACCOUNT_PR
   ? process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY.replace(/\\n/g, '\n')
   : undefined;
 const GOOGLE_SHEET_RANGE = process.env.GOOGLE_SHEET_RANGE || 'Sheet1!A1:AA1';
+const SERVER_BASE = process.env.SERVER_BASE || 'https://website-tracmeds-backend-on-render.onrender.com';
 
 if (GOOGLE_SHEET_ID && GOOGLE_SERVICE_ACCOUNT_EMAIL && GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) {
   console.log('Google Sheets bookkeeping enabled.');
@@ -894,13 +895,21 @@ app.post('/api/payment-callback', async (req, res) => {
   const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = req.body;
   const returnUrl = req.query.return_url || 'tracmeds://payment/complete';
   const cancelUrl = req.query.cancel_url || 'tracmeds://payment/cancel';
-  const appendStatus = (url, status) => {
-    const separator = String(url).includes('?') ? '&' : '?';
-    return `${url}${separator}status=${encodeURIComponent(status)}`;
+
+  // Redirect back through razorpay-checkout.html instead of straight to the
+  // tracmeds:// deep link. That page already has success/fail card UI and
+  // the JS that attempts the app handoff — a raw server-side 302 straight
+  // to a custom URL scheme is what was causing "Safari can't open the page".
+  const checkoutPageUrl = (status) => {
+    const url = new URL('/razorpay-checkout.html', SERVER_BASE);
+    url.searchParams.set('callback_status', status);
+    url.searchParams.set('return_url', returnUrl);
+    url.searchParams.set('cancel_url', cancelUrl);
+    return url.toString();
   };
 
   if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature) {
-    return res.redirect(302, appendStatus(cancelUrl, 'failed'));
+    return res.redirect(302, checkoutPageUrl('failed'));
   }
 
   const generated_signature = crypto
@@ -909,7 +918,7 @@ app.post('/api/payment-callback', async (req, res) => {
     .digest('hex');
 
   if (generated_signature !== razorpay_signature) {
-    return res.redirect(302, appendStatus(cancelUrl, 'failed'));
+    return res.redirect(302, checkoutPageUrl('failed'));
   }
 
   // Signature verified — now build the invoice/ledger/email, same as /api/verify-payment,
@@ -948,7 +957,7 @@ app.post('/api/payment-callback', async (req, res) => {
     // the payment itself is already verified and successful at this point.
   }
 
-  return res.redirect(302, appendStatus(returnUrl, 'success'));
+  return res.redirect(302, checkoutPageUrl('success'));
 });
 
 // Appends a subscription lifecycle event (active, renewed, expired) to the
