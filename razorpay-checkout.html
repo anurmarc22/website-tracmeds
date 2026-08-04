@@ -148,6 +148,15 @@
       color: var(--muted);
       margin-top: 6px;
     }
+    .field-error {
+      font-size: 0.78rem;
+      color: #c0392b;
+      margin-top: 6px;
+      min-height: 14px;
+    }
+    .field input.invalid {
+      border-color: #c0392b;
+    }
     .plan-name { font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
     .plan-price { font-family: 'Fraunces', Georgia, serif; font-size: 2rem; font-weight: 600; color: var(--ink); }
     .plan-price span { font-size: 1rem; color: var(--muted); font-weight: 500; }
@@ -270,7 +279,8 @@
         </div>
         <div class="field" id="gstin-field" style="display:none;">
           <label for="customer-gstin">GSTIN</label>
-          <input id="customer-gstin" name="customer-gstin" type="text" placeholder="22AAAAA0000A1Z5" />
+          <input id="customer-gstin" name="customer-gstin" type="text" placeholder="e.g., 27ABCDE1234F1Z5" maxlength="15" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+          <div class="field-error" id="gstin-error"></div>
         </div>
       </form>
       <div class="hint">If you request a GST invoice, we will use these details to issue it and keep the transaction record for bookkeeping and compliance.</div>
@@ -349,14 +359,91 @@
     const gstRequiredEl = document.getElementById('gst-required');
     const gstinFieldEl = document.getElementById('gstin-field');
     const customerGstinEl = document.getElementById('customer-gstin');
+    const gstinErrorEl = document.getElementById('gstin-error');
 
     const checkoutForm = document.getElementById('checkout-form');
+
+    // Standard GSTIN pattern: 2-digit state code, 10-char PAN, entity code,
+    // literal "Z", and a checksum character.
+    const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+    const GSTIN_PAN_SEGMENT_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+
+    // Validates the GSTIN field against the required checkbox and shows a
+    // real-time message. Returns true only when the field is in a state
+    // that should allow the Pay Now flow to proceed.
+    function validateGstin() {
+      const needsGstin = gstRequiredEl.checked;
+
+      if (!needsGstin) {
+        customerGstinEl.setCustomValidity('');
+        customerGstinEl.classList.remove('invalid');
+        gstinErrorEl.textContent = '';
+        return true;
+      }
+
+      // Normalize: strip anything that isn't 0-9/A-Z and force uppercase,
+      // so pasted values with spaces/hyphens/lowercase still get checked.
+      const raw = customerGstinEl.value;
+      const cleaned = raw.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 15);
+      if (cleaned !== raw) customerGstinEl.value = cleaned;
+
+      if (cleaned.length === 0) {
+        customerGstinEl.setCustomValidity('GSTIN is required for a GST invoice.');
+        customerGstinEl.classList.remove('invalid');
+        gstinErrorEl.textContent = '';
+        return false;
+      }
+      if (cleaned.length < 15) {
+        customerGstinEl.setCustomValidity('Incomplete GSTIN.');
+        customerGstinEl.classList.add('invalid');
+        gstinErrorEl.textContent = 'GST number must be exactly 15 characters long.';
+        return false;
+      }
+      if (cleaned.charAt(13) !== 'Z') {
+        customerGstinEl.setCustomValidity('Invalid GSTIN.');
+        customerGstinEl.classList.add('invalid');
+        gstinErrorEl.textContent = "Invalid format. The 14th character of a GSTIN must be 'Z'.";
+        return false;
+      }
+      if (!GSTIN_PAN_SEGMENT_REGEX.test(cleaned.slice(0, 12))) {
+        customerGstinEl.setCustomValidity('Invalid GSTIN.');
+        customerGstinEl.classList.add('invalid');
+        gstinErrorEl.textContent = 'The PAN segment (characters 3-12) of your GSTIN is invalid.';
+        return false;
+      }
+      if (!GSTIN_REGEX.test(cleaned)) {
+        customerGstinEl.setCustomValidity('Invalid GSTIN.');
+        customerGstinEl.classList.add('invalid');
+        gstinErrorEl.textContent = 'GSTIN format is invalid. Please check and re-enter.';
+        return false;
+      }
+
+      customerGstinEl.setCustomValidity('');
+      customerGstinEl.classList.remove('invalid');
+      gstinErrorEl.textContent = '';
+      return true;
+    }
+
+    customerGstinEl.addEventListener('input', validateGstin);
+
+    // Strip spaces/hyphens and force uppercase on paste, instead of relying
+    // on the user to clean it up manually.
+    customerGstinEl.addEventListener('paste', function (e) {
+      e.preventDefault();
+      const text = (e.clipboardData || window.clipboardData).getData('text');
+      const cleaned = text.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 15);
+      const start = customerGstinEl.selectionStart || 0;
+      const end = customerGstinEl.selectionEnd || 0;
+      const current = customerGstinEl.value;
+      customerGstinEl.value = (current.slice(0, start) + cleaned + current.slice(end)).slice(0, 15);
+      validateGstin();
+    });
 
     gstRequiredEl.addEventListener('change', function () {
       const needsGstin = gstRequiredEl.checked;
       gstinFieldEl.style.display = needsGstin ? 'block' : 'none';
       customerGstinEl.required = needsGstin;
-      if (!needsGstin) customerGstinEl.setCustomValidity('');
+      validateGstin();
     });
 
     // Loose phone check: strip everything but digits and require at least 10.
@@ -369,8 +456,13 @@
 
     function validateForm() {
       customerPhoneEl.dispatchEvent(new Event('input'));
+      const gstinOk = validateGstin();
       if (!checkoutForm.reportValidity()) {
         setStatus('Please fill in all the required invoice details above.', true);
+        return false;
+      }
+      if (!gstinOk) {
+        setStatus('Please enter a valid 15-character GSTIN, or turn off "I need a GST invoice".', true);
         return false;
       }
       return true;
