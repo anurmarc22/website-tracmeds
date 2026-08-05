@@ -877,6 +877,17 @@ function findMissingInvoiceFields(notes = {}) {
   return missing;
 }
 
+// Server-side source of truth for plan pricing (in paise). The client sends
+// `amount` and `notes.plan` together, but neither is trusted on its own —
+// without this, a direct API call could request a valid-looking amount
+// (e.g. 100 paise) for a real subscription and bypass the actual price
+// shown in the checkout UI. Keep this in sync with PLAN_DETAILS in
+// razorpay-checkout.html and DEFAULT_PACKAGES in SubscriptionContext.tsx.
+const PLAN_PRICES = {
+  monthly: 14900,
+  annual: 129900,
+};
+
 async function handleCreateOrder(req, res) {
   try {
     const { amount, currency = 'INR', receipt = 'receipt#1', notes = {} } = req.body;
@@ -884,6 +895,13 @@ async function handleCreateOrder(req, res) {
     if (isNaN(amountInt) || amountInt < 100) {
       return res.status(400).json({ error: 'Invalid amount. Minimum is 100 paise.' });
     }
+
+    const planKey = String(notes.plan || '').toLowerCase().includes('annual') ? 'annual' : 'monthly';
+    const expectedAmount = PLAN_PRICES[planKey];
+    if (amountInt !== expectedAmount) {
+      return res.status(400).json({ error: 'Amount does not match the selected plan.' });
+    }
+
     const missingFields = findMissingInvoiceFields(notes);
     if (missingFields.length > 0) {
       return res.status(400).json({ error: `Missing required invoice details: ${missingFields.join(', ')}` });
