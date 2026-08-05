@@ -273,7 +273,7 @@
             </optgroup>
           </select>
         </div>
-        <div class="toggle-row">
+        <div class="toggle-row" id="gst-required-row">
           <label for="gst-required">I need a GST invoice</label>
           <input id="gst-required" name="gst-required" type="checkbox" />
         </div>
@@ -283,7 +283,8 @@
           <div class="field-error" id="gstin-error"></div>
         </div>
       </form>
-      <div class="hint">If you request a GST invoice, we will use these details to issue it and keep the transaction record for bookkeeping and compliance.</div>
+      <div class="hint" id="gst-hint">If you request a GST invoice, we will use these details to issue it and keep the transaction record for bookkeeping and compliance.</div>
+      <div class="hint" id="export-hint" style="display:none;">Supplies to customers outside India are zero-rated exports under LUT — no GST applies, so a GSTIN isn't needed. You'll receive an export invoice instead.</div>
     </div>
 
     <button id="pay-button" class="btn" type="button">Pay now</button>
@@ -445,6 +446,43 @@
       customerGstinEl.required = needsGstin;
       validateGstin();
     });
+
+    const gstRequiredRowEl = document.getElementById('gst-required-row');
+    const gstHintEl = document.getElementById('gst-hint');
+    const exportHintEl = document.getElementById('export-hint');
+
+    // "Outside India" supplies are zero-rated exports under LUT regardless of
+    // whether the customer wants a GST invoice — the backend's buildInvoiceData
+    // already overrides gstRequired entirely for exportSupply. So there's no
+    // reason to ask for a GSTIN in that case; hide the toggle and GSTIN field,
+    // and reset any values so a state change back to India doesn't leave stale
+    // export-mode data behind.
+    function applyPlaceOfSupplyRules() {
+      const isExport = customerStateEl.value === 'Outside India';
+
+      if (isExport) {
+        gstRequiredRowEl.style.display = 'none';
+        gstinFieldEl.style.display = 'none';
+        gstHintEl.style.display = 'none';
+        exportHintEl.style.display = 'block';
+
+        gstRequiredEl.checked = false;
+        customerGstinEl.required = false;
+        customerGstinEl.value = '';
+        customerGstinEl.setCustomValidity('');
+        customerGstinEl.classList.remove('invalid');
+        gstinErrorEl.textContent = '';
+      } else {
+        gstRequiredRowEl.style.display = 'flex';
+        gstHintEl.style.display = 'block';
+        exportHintEl.style.display = 'none';
+        gstinFieldEl.style.display = gstRequiredEl.checked ? 'block' : 'none';
+        customerGstinEl.required = gstRequiredEl.checked;
+      }
+    }
+
+    customerStateEl.addEventListener('change', applyPlaceOfSupplyRules);
+    applyPlaceOfSupplyRules();
 
     // Loose phone check: strip everything but digits and require at least 10.
     // Doesn't force a specific format so +91 prefixes, spaces, or dashes
