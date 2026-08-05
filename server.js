@@ -793,11 +793,12 @@ async function sendInvoiceEmail(invoice) {
 
   try {
     const result = await resend.emails.send({
-      from: process.env.EMAIL_FROM || 'TracMeds <invoices@tracmeds.com>',
-      to: invoice.customerEmail,
-      subject: `TracMeds Invoice ${invoice.invoiceNumber}`,
-      html,
-    });
+  from: process.env.EMAIL_FROM || 'TracMeds <invoices@tracmeds.com>',
+  to: invoice.customerEmail,
+  bcc: process.env.INVOICE_BCC_EMAIL,
+  subject: `TracMeds Invoice ${invoice.invoiceNumber}`,
+  html,
+});
 
     if (result.error) {
       console.error('Resend API returned an error sending invoice email', result.error);
