@@ -88,21 +88,60 @@ function getLedgerEntries() {
   }
 }
 
-function getNextInvoiceNumber(prefix = 'TRACMEDS', year = new Date().getFullYear()) {
-  const entries = getLedgerEntries();
-  const invoicePrefix = `${prefix}-${year}-`;
+function highestSequenceFromInvoiceNumbers(invoiceNumbers, invoicePrefix) {
   let highest = 0;
-
-  entries.forEach((entry) => {
-    const raw = String(entry.invoiceNumber || '');
-    if (!raw.startsWith(invoicePrefix)) return;
-    const sequencePart = raw.slice(invoicePrefix.length).replace(/^0+/, '') || '0';
+  invoiceNumbers.forEach((raw) => {
+    const value = String(raw || '');
+    if (!value.startsWith(invoicePrefix)) return;
+    const sequencePart = value.slice(invoicePrefix.length).replace(/^0+/, '') || '0';
     const sequence = parseInt(sequencePart, 10);
     if (!Number.isNaN(sequence) && sequence > highest) {
       highest = sequence;
     }
   });
+  return highest;
+}
 
+// Render's local disk is NOT persistent across redeploys/restarts — ledger.json
+// resets, which would silently restart invoice numbering at 0001. Google Sheets
+// is the durable record, so the real next-number lookup reads the Sheet's
+// "Invoice Number" column and takes the max against the local ledger too (in
+// case a very recent entry hasn't made it into the Sheet yet for any reason).
+async function getNextInvoiceNumber(prefix = 'TRACMEDS', year = new Date().getFullYear()) {
+  const invoicePrefix = `${prefix}-${year}-`;
+  let highestFromSheet = 0;
+
+  const sheets = getSheetsClient();
+  if (sheets) {
+    try {
+      const sheetName = GOOGLE_SHEET_RANGE.split('!')[0] || 'Sheet1';
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: GOOGLE_SHEET_ID,
+        range: `${sheetName}!A:Z`,
+      });
+      const rows = response.data.values || [];
+      if (rows.length > 1) {
+        const header = rows[0] || [];
+        const invoiceIndex = header.findIndex(
+          (col) => String(col || '').trim().toLowerCase() === 'invoice number'
+        );
+        if (invoiceIndex !== -1) {
+          const invoiceNumbers = rows.slice(1).map((row) => row[invoiceIndex]);
+          highestFromSheet = highestSequenceFromInvoiceNumbers(invoiceNumbers, invoicePrefix);
+        }
+      }
+    } catch (error) {
+      console.warn('Unable to read invoice numbers from Google Sheet; falling back to local ledger only.', error.message);
+    }
+  }
+
+  const entries = getLedgerEntries();
+  const highestFromLedger = highestSequenceFromInvoiceNumbers(
+    entries.map((entry) => entry.invoiceNumber),
+    invoicePrefix
+  );
+
+  const highest = Math.max(highestFromSheet, highestFromLedger);
   const nextSequence = String(highest + 1).padStart(4, '0');
   return `${invoicePrefix}${nextSequence}`;
 }
@@ -456,7 +495,7 @@ function calculatePayoutEstimate({ amount, feeRatePercent = 2.0, gstPercent = 18
   };
 }
 
-function buildInvoiceData({ name, phone, email, address, gstRequired, gstin, amount, currency = 'INR', plan, paymentId, orderId, receipt, placeOfSupply = 'Maharashtra' }) {
+function buildInvoiceData({ name, phone, email, address, gstRequired, gstin, amount, currency = 'INR', plan, paymentId, orderId, receipt, placeOfSupply = 'Maharashtra', invoiceNumber }) {
   const normalizedPlace = sanitizeText(placeOfSupply) || 'Maharashtra';
   const amountInRupees = parseInt(amount, 10) / 100;
   const exportSupply = isExportSupply(normalizedPlace);
@@ -481,7 +520,18 @@ function buildInvoiceData({ name, phone, email, address, gstRequired, gstin, amo
   const sgstAmountNum = gstApplies && intraState ? Number((taxTotalNum / 2).toFixed(2)) : 0;
   const igstAmountNum = gstApplies && !intraState ? Number(taxTotalNum.toFixed(2)) : 0;
   const payoutEstimate = calculatePayoutEstimate({ amount });
-  const invoiceNumber = getNextInvoiceNumber('TRACMEDS', new Date().getFullYear());
+  // invoiceNumber is computed by the caller (async, via getNextInvoiceNumber
+  // against the Google Sheet + local ledger) and passed in here. The local-only
+  // fallback below only fires if a caller forgets to pass one in.
+  const resolvedInvoiceNumber = invoiceNumber || (() => {
+    const entries = getLedgerEntries();
+    const invoicePrefix = `TRACMEDS-${new Date().getFullYear()}-`;
+    const highest = highestSequenceFromInvoiceNumbers(
+      entries.map((entry) => entry.invoiceNumber),
+      invoicePrefix
+    );
+    return `${invoicePrefix}${String(highest + 1).padStart(4, '0')}`;
+  })();
 
   const isAnnual = String(plan || '').toLowerCase().includes('annual');
   const planLabel = isAnnual ? 'Annual' : 'Monthly';
@@ -492,7 +542,7 @@ function buildInvoiceData({ name, phone, email, address, gstRequired, gstin, amo
     : (isAnnual ? 'Annual premium access / subscription for the TracMeds app service' : 'Premium access / subscription for the TracMeds app service');
 
   return {
-    invoiceNumber,
+    invoiceNumber: resolvedInvoiceNumber,
     invoiceMode,
     customerName: sanitizeText(name),
     customerPhone: sanitizeText(phone),
@@ -858,6 +908,7 @@ async function handleVerifyPayment(req, res) {
     .update(razorpay_order_id + '|' + razorpay_payment_id)
     .digest('hex');
   if (generated_signature === razorpay_signature) {
+    const invoiceNumber = await getNextInvoiceNumber('TRACMEDS', new Date().getFullYear());
     const invoice = buildInvoiceData({
       name: notes.name,
       phone: notes.phone,
@@ -872,6 +923,7 @@ async function handleVerifyPayment(req, res) {
       paymentId: razorpay_payment_id,
       orderId: razorpay_order_id,
       receipt: notes.receipt,
+      invoiceNumber,
     });
     appendLedgerEntry(invoice);
     const sheetResult = await appendTransactionToSheet(invoice);
@@ -930,6 +982,7 @@ app.post('/api/payment-callback', async (req, res) => {
       notes = JSON.parse(Buffer.from(decodeURIComponent(req.query.customer_data), 'base64').toString('utf8'));
     }
 
+    const invoiceNumber = await getNextInvoiceNumber('TRACMEDS', new Date().getFullYear());
     const invoice = buildInvoiceData({
       name: notes.name,
       phone: notes.phone,
@@ -944,6 +997,7 @@ app.post('/api/payment-callback', async (req, res) => {
       paymentId: razorpay_payment_id,
       orderId: razorpay_order_id,
       receipt: notes.receipt,
+      invoiceNumber,
     });
 
     appendLedgerEntry(invoice);
