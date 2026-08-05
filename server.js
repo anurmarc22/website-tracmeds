@@ -230,11 +230,48 @@ function getSheetsClient() {
     email: GOOGLE_SERVICE_ACCOUNT_EMAIL,
     key: GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
     scopes: [
-    'https://www.googleapis.com/auth/spreadsheets',
-    'https://www.googleapis.com/auth/drive.file',
-  ],
+      'https://www.googleapis.com/auth/spreadsheets',
+      'https://www.googleapis.com/auth/drive.file',
+    ],
+  });
 
   return google.sheets({ version: 'v4', auth });
+}
+
+function getDriveClient() {
+  if (!GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) return null;
+  const auth = new google.auth.JWT({
+    email: GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    key: GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
+    scopes: ['https://www.googleapis.com/auth/drive.file'],
+  });
+  return google.drive({ version: 'v3', auth });
+}
+
+async function saveInvoiceToDrive(invoice, html) {
+  const drive = getDriveClient();
+  const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
+  if (!drive || !folderId) {
+    return { success: false, reason: 'missing_drive_configuration' };
+  }
+  try {
+    const { Readable } = require('stream');
+    await drive.files.create({
+      requestBody: {
+        name: `${invoice.invoiceNumber}.html`,
+        parents: [folderId],
+        mimeType: 'text/html',
+      },
+      media: {
+        mimeType: 'text/html',
+        body: Readable.from([html]),
+      },
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('Unable to save invoice to Google Drive', error);
+    return { success: false, reason: 'drive_error', error: error.message };
+  }
 }
 
 async function ensureSheetHeaderRow(sheets) {
@@ -881,6 +918,8 @@ async function handleVerifyPayment(req, res) {
       console.warn('Google Sheets bookkeeping record could not be appended.', sheetResult);
     }
     await sendInvoiceEmail(invoice);
+    const driveResult = await saveInvoiceToDrive(invoice, buildInvoiceEmailHtml(invoice));
+    if (!driveResult.success) console.warn('Drive save failed', driveResult);
     return res.json({ success: true, invoice });
   }
   return res.status(400).json({ success: false, error: 'Signature mismatch' });
@@ -954,6 +993,8 @@ app.post('/api/payment-callback', async (req, res) => {
       console.warn('Google Sheets bookkeeping record could not be appended.', sheetResult);
     }
     await sendInvoiceEmail(invoice);
+    const driveResult = await saveInvoiceToDrive(invoice, buildInvoiceEmailHtml(invoice));
+    if (!driveResult.success) console.warn('Drive save failed', driveResult);
   } catch (error) {
     console.error('Error building invoice during payment-callback redirect flow', error);
     // Don't block the user's redirect just because invoice/ledger logging failed —
