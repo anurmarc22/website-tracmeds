@@ -135,11 +135,25 @@
     </div>
   </main>
   <script>
+    // sw.js has been removed from the repo — unregister any previously
+    // installed service worker and clear its caches so returning visitors
+    // stop getting stale cached content (like old download links).
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function() {
-        navigator.serviceWorker.register('./sw.js').catch(function(error) {
-          console.warn('Service worker registration failed', error);
+      navigator.serviceWorker.getRegistrations().then(function (registrations) {
+        registrations.forEach(function (registration) {
+          registration.unregister();
         });
+      }).catch(function (error) {
+        console.warn('Service worker cleanup failed', error);
+      });
+    }
+    if ('caches' in window) {
+      caches.keys().then(function (names) {
+        names.forEach(function (name) {
+          caches.delete(name);
+        });
+      }).catch(function (error) {
+        console.warn('Cache cleanup failed', error);
       });
     }
   </script>
