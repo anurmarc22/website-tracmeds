@@ -13,9 +13,11 @@ import { useColors } from '@/hooks/useColors';
 import { useApp } from '@/context/AppContext';
 import { useSubscription } from '@/context/SubscriptionContext';
 import TimeInput12h from '@/components/TimeInput12h';
-import ExportModal from './ExportModal';
+import ExportModal from '@/components/ExportModal';
+import DataWarningModal from '@/components/DataWarningModal';
 import { formatTime12 } from '@/utils/time';
 import { UserProfile, NotificationContact, ContactRelation } from '@/types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const GENDER_OPTIONS: { value: NonNullable<UserProfile['gender']>; label: string }[] = [
   { value: 'male', label: 'Male' },
@@ -172,6 +174,40 @@ export default function ProfileScreen() {
   const [showEdit, setShowEdit] = useState(false);
   const [showAddContact, setShowAddContact] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [showDataWarning, setShowDataWarning] = useState(false);
+  const [dataWarningReady, setDataWarningReady] = useState(false);
+
+  React.useEffect(() => {
+    let mounted = true;
+    AsyncStorage.getItem('@tracmeds:dataWarningShown').then((value) => {
+      if (!mounted) return;
+      setDataWarningReady(true);
+      if (value !== 'true') {
+        setShowDataWarning(true);
+      }
+    }).catch(() => {
+      if (!mounted) return;
+      setDataWarningReady(true);
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const handleOpenExport = () => {
+    setShowDataWarning(false);
+    setShowExport(true);
+  };
+
+  const handleDismissDataWarning = async () => {
+    try {
+      await AsyncStorage.setItem('@tracmeds:dataWarningShown', 'true');
+    } catch {
+      // ignore storage failures
+    }
+    setShowDataWarning(false);
+  };
 
   const isWeb = Platform.OS === 'web';
   const topPad = isWeb ? 67 : insets.top;
@@ -380,11 +416,19 @@ export default function ProfileScreen() {
             <Text style={s.settingLabel}>Terms & Privacy</Text>
             <Ionicons name="chevron-forward" size={16} color={colors.border} />
           </TouchableOpacity>
+          <TouchableOpacity style={s.settingRow} onPress={() => setShowDataWarning(true)}>
+            <View style={[s.settingIcon, { backgroundColor: colors.muted }]}> 
+              <Ionicons name="alert-circle-outline" size={18} color={colors.mutedForeground} />
+            </View>
+            <Text style={s.settingLabel}>Data loss warning</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.border} />
+          </TouchableOpacity>
         </View>
       </ScrollView>
 
       <EditProfileModal visible={showEdit} profile={profile} colors={colors} onClose={() => setShowEdit(false)} onSave={updateProfile} />
       <AddContactModal visible={showAddContact} colors={colors} onClose={() => setShowAddContact(false)} onSave={addContact} />
+      <DataWarningModal visible={showDataWarning && dataWarningReady} onClose={handleDismissDataWarning} onOpenExport={handleOpenExport} />
       <ExportModal visible={showExport} onClose={() => setShowExport(false)} />
     </View>
   );
@@ -393,9 +437,9 @@ export default function ProfileScreen() {
 function makeStyles(colors: ReturnType<typeof useColors>) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
-    brandBar: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 20, paddingTop: 6, paddingBottom: 4 },
-    brandIcon: { width: 13, height: 13, borderRadius: 3 },
-    brandText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.primary, letterSpacing: 0.8, textTransform: 'uppercase' },
+    brandBar: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 20, paddingTop: 6, paddingBottom: 4 },
+    brandIcon: { width: 16, height: 16, borderRadius: 4, flexShrink: 0 },
+    brandText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary, letterSpacing: 0.8, textTransform: 'uppercase' },
     content: { gap: 16, paddingHorizontal: 20 },
     hero: { borderRadius: 20, padding: 24, alignItems: 'center', marginBottom: 0 },
     avatarWrap: { marginBottom: 12 },
