@@ -207,7 +207,7 @@ function evaluateDeviceAccessPolicy(existingDeviceIds, incomingDeviceId) {
     return { allowed: true, added: false, deviceIds: uniqueDevices };
   }
 
-  if (uniqueDevices.length > 3) {
+  if (!alreadyExists && normalizedExisting.length >= 3) {
     return {
       allowed: false,
       added: false,
@@ -216,7 +216,86 @@ function evaluateDeviceAccessPolicy(existingDeviceIds, incomingDeviceId) {
     };
   }
 
-  return { allowed: true, added: true, deviceIds: uniqueDevices };
+  return { allowed: true, added: !alreadyExists, deviceIds: uniqueDevices };
+}
+
+async function ensureDevicesHeaderRow(sheets) {
+  const sheetName = 'Devices';
+  const headerRange = `${sheetName}!A1:C1`;
+  try {
+    const response = await sheets.spreadsheets.values.get({ spreadsheetId: GOOGLE_SHEET_ID, range: headerRange });
+    const rows = response.data.values || [];
+    if (rows.length === 0 || rows[0].every((cell) => cell === '')) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: GOOGLE_SHEET_ID,
+        range: headerRange,
+        valueInputOption: 'RAW',
+        requestBody: {
+          values: [['AccessKey', 'DeviceId', 'AddedAt']],
+        },
+      });
+    }
+  } catch (err) {
+    // ignore — sheet may not exist or client not configured
+  }
+}
+
+async function getDevicesFromSheet(accessKey) {
+  const sheets = getSheetsClient();
+  if (!sheets || !accessKey) return [];
+
+  const sheetName = 'Devices';
+  const lookupRange = `${sheetName}!A:C`;
+
+  try {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: lookupRange,
+    });
+
+    const rows = response.data.values || [];
+    if (rows.length <= 1) return [];
+
+    const header = rows[0] || [];
+    const keyIndex = header.findIndex((col) => String(col || '').trim().toLowerCase() === 'accesskey');
+    const deviceIndex = header.findIndex((col) => String(col || '').trim().toLowerCase() === 'deviceid');
+    if (keyIndex === -1 || deviceIndex === -1) return [];
+
+    return rows.slice(1).reduce((devices, row) => {
+      if (String(row[keyIndex] || '').trim().toLowerCase() === accessKey.toLowerCase()) {
+        const deviceId = String(row[deviceIndex] || '').trim();
+        if (deviceId) devices.push(deviceId);
+      }
+      return devices;
+    }, []);
+  } catch (error) {
+    console.warn('Unable to read devices from Google Sheet', error.message);
+    return [];
+  }
+}
+
+async function appendDeviceToSheet(accessKey, deviceId) {
+  const sheets = getSheetsClient();
+  if (!sheets) return { success: false, reason: 'missing_google_sheets_configuration' };
+
+  try {
+    await ensureDevicesHeaderRow(sheets);
+    const sheetName = 'Devices';
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `${sheetName}!A1:C1`,
+      valueInputOption: 'USER_ENTERED',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: {
+        values: [[accessKey, deviceId, new Date().toISOString()]],
+      },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Unable to append device to Google Sheet', error);
+    return { success: false, reason: 'google_sheets_error', error: error.message };
+  }
 }
 
 async function findLedgerEntryInSheet(email, phone) {
@@ -1133,17 +1212,14 @@ app.post('/api/subscription-event', async (req, res) => {
 
     if (deviceId && (email || phone)) {
       const accessKey = `${normalizeEmail(email || '')}:${normalizePhone(phone || '')}`;
-      const ledgerPath = process.env.LEDGER_FILE_PATH || path.join(__dirname, 'ledger.json');
-      const existingEntries = JSON.parse(fs.existsSync(ledgerPath) ? fs.readFileSync(ledgerPath, 'utf8') : '[]');
-      const existingRecord = existingEntries.find((entry) => entry.accessKey === accessKey);
-      const currentDevices = existingRecord?.devices || [];
+      const currentDevices = await getDevicesFromSheet(accessKey);
       const policy = evaluateDeviceAccessPolicy(currentDevices, deviceId);
-      if (!existingRecord) {
-        existingEntries.push({ accessKey, devices: policy.deviceIds, createdAt: new Date().toISOString() });
-      } else if (policy.added || policy.allowed) {
-        existingRecord.devices = policy.deviceIds;
+      if (policy.allowed && policy.added) {
+        const appendResult = await appendDeviceToSheet(accessKey, deviceId);
+        if (!appendResult.success) {
+          console.warn('Device tracking sheet append failed', appendResult);
+        }
       }
-      fs.writeFileSync(ledgerPath, JSON.stringify(existingEntries, null, 2), 'utf8');
     }
 
     return res.json({ success: true });
@@ -1181,20 +1257,14 @@ app.post('/api/restore-subscription', restoreRateLimiter, async (req, res) => {
       return res.status(404).json({ success: false, error: 'No matching purchase found for these details.' });
     }
 
-    const ledgerPath = process.env.LEDGER_FILE_PATH || path.join(__dirname, 'ledger.json');
-    const existingEntries = JSON.parse(fs.existsSync(ledgerPath) ? fs.readFileSync(ledgerPath, 'utf8') : '[]');
     const accessKey = `${email}:${phone}`;
-    const existingRecord = existingEntries.find((entry) => entry.accessKey === accessKey);
-    const currentDevices = existingRecord?.devices || [];
+    const currentDevices = await getDevicesFromSheet(accessKey);
     const policy = evaluateDeviceAccessPolicy(currentDevices, deviceId);
 
-    if (deviceId && !existingRecord) {
-      existingEntries.push({ accessKey, devices: policy.deviceIds, createdAt: new Date().toISOString() });
-      fs.writeFileSync(ledgerPath, JSON.stringify(existingEntries, null, 2), 'utf8');
-    } else if (deviceId && existingRecord) {
-      if (policy.added || policy.allowed) {
-        existingRecord.devices = policy.deviceIds;
-        fs.writeFileSync(ledgerPath, JSON.stringify(existingEntries, null, 2), 'utf8');
+    if (deviceId && policy.allowed && policy.added) {
+      const appendResult = await appendDeviceToSheet(accessKey, deviceId);
+      if (!appendResult.success) {
+        console.warn('Device tracking sheet append failed', appendResult);
       }
     }
 
@@ -1245,4 +1315,5 @@ module.exports = {
   appendLedgerEntry,
   getLedgerEntries,
   calculatePayoutEstimate,
+  evaluateDeviceAccessPolicy,
 };
