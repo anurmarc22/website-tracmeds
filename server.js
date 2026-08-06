@@ -191,6 +191,34 @@ function getPlanDurationDays(plan) {
   return raw.includes('annual') ? 365 : 30;
 }
 
+function evaluateDeviceAccessPolicy(existingDeviceIds, incomingDeviceId) {
+  const normalizedExisting = Array.isArray(existingDeviceIds)
+    ? existingDeviceIds.filter(Boolean).map((value) => String(value))
+    : [];
+  const normalizedIncoming = String(incomingDeviceId || '').trim();
+  const uniqueDevices = Array.from(new Set([...normalizedExisting, normalizedIncoming].filter(Boolean)));
+  const alreadyExists = normalizedExisting.includes(normalizedIncoming);
+
+  if (normalizedIncoming && alreadyExists) {
+    return { allowed: true, added: false, deviceIds: uniqueDevices };
+  }
+
+  if (!normalizedIncoming) {
+    return { allowed: true, added: false, deviceIds: uniqueDevices };
+  }
+
+  if (uniqueDevices.length > 3) {
+    return {
+      allowed: false,
+      added: false,
+      error: 'This plan has reached its device limit (3). Please purchase a new subscription to continue.',
+      deviceIds: uniqueDevices,
+    };
+  }
+
+  return { allowed: true, added: true, deviceIds: uniqueDevices };
+}
+
 async function findLedgerEntryInSheet(email, phone) {
   const sheets = getSheetsClient();
   if (!sheets) return null;
@@ -1097,11 +1125,26 @@ async function appendSubscriptionEventToSheet(event) {
 // Replaces the earlier /api/subscription-expired route.
 app.post('/api/subscription-event', async (req, res) => {
   try {
-    const { user, plan, purchasedAt, expiresAt, status, isRenewal } = req.body || {};
+    const { user, plan, purchasedAt, expiresAt, status, isRenewal, deviceId, email, phone } = req.body || {};
     if (!plan || !status) return res.status(400).json({ success: false, error: 'Missing plan or status field' });
 
     const result = await appendSubscriptionEventToSheet({ user, plan, purchasedAt, expiresAt, status, isRenewal });
     if (!result.success) console.warn('Subscription event sheet append failed', result);
+
+    if (deviceId && (email || phone)) {
+      const accessKey = `${normalizeEmail(email || '')}:${normalizePhone(phone || '')}`;
+      const ledgerPath = process.env.LEDGER_FILE_PATH || path.join(__dirname, 'ledger.json');
+      const existingEntries = JSON.parse(fs.existsSync(ledgerPath) ? fs.readFileSync(ledgerPath, 'utf8') : '[]');
+      const existingRecord = existingEntries.find((entry) => entry.accessKey === accessKey);
+      const currentDevices = existingRecord?.devices || [];
+      const policy = evaluateDeviceAccessPolicy(currentDevices, deviceId);
+      if (!existingRecord) {
+        existingEntries.push({ accessKey, devices: policy.deviceIds, createdAt: new Date().toISOString() });
+      } else if (policy.added || policy.allowed) {
+        existingRecord.devices = policy.deviceIds;
+      }
+      fs.writeFileSync(ledgerPath, JSON.stringify(existingEntries, null, 2), 'utf8');
+    }
 
     return res.json({ success: true });
   } catch (err) {
@@ -1126,6 +1169,7 @@ app.post('/api/restore-subscription', restoreRateLimiter, async (req, res) => {
   try {
     const email = normalizeEmail(req.body?.email);
     const phone = normalizePhone(req.body?.phone);
+    const deviceId = String(req.body?.deviceId || '').trim();
 
     if (!email || !phone) {
       return res.status(400).json({ success: false, error: 'Both email and phone are required.' });
@@ -1135,6 +1179,27 @@ app.post('/api/restore-subscription', restoreRateLimiter, async (req, res) => {
 
     if (!latest) {
       return res.status(404).json({ success: false, error: 'No matching purchase found for these details.' });
+    }
+
+    const ledgerPath = process.env.LEDGER_FILE_PATH || path.join(__dirname, 'ledger.json');
+    const existingEntries = JSON.parse(fs.existsSync(ledgerPath) ? fs.readFileSync(ledgerPath, 'utf8') : '[]');
+    const accessKey = `${email}:${phone}`;
+    const existingRecord = existingEntries.find((entry) => entry.accessKey === accessKey);
+    const currentDevices = existingRecord?.devices || [];
+    const policy = evaluateDeviceAccessPolicy(currentDevices, deviceId);
+
+    if (deviceId && !existingRecord) {
+      existingEntries.push({ accessKey, devices: policy.deviceIds, createdAt: new Date().toISOString() });
+      fs.writeFileSync(ledgerPath, JSON.stringify(existingEntries, null, 2), 'utf8');
+    } else if (deviceId && existingRecord) {
+      if (policy.added || policy.allowed) {
+        existingRecord.devices = policy.deviceIds;
+        fs.writeFileSync(ledgerPath, JSON.stringify(existingEntries, null, 2), 'utf8');
+      }
+    }
+
+    if (deviceId && !policy.allowed) {
+      return res.status(403).json({ success: false, error: policy.error });
     }
 
     const plan = String(latest.plan || 'monthly').toLowerCase();
