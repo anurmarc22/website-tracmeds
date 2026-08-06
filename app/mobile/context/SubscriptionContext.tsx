@@ -334,8 +334,8 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const restore = useCallback(async (identity: { email?: string; phone?: string }) => {
     const email = String(identity?.email || '').trim().toLowerCase();
     const phone = String(identity?.phone || '').trim();
-    if (!email && !phone) {
-      return { success: false, error: 'Enter email or phone to restore your plan.' };
+    if (!email || !phone) {
+      return { success: false, error: 'Enter both the email and phone used during payment to restore your plan.' };
     }
 
     try {
