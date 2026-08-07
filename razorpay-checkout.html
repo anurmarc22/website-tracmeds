@@ -344,7 +344,12 @@
     if (callbackStatus === 'success') {
       document.querySelector('.card').style.display = 'none';
       document.getElementById('success-card').style.display = 'block';
-      window.location.href = returnUrl + (returnUrl.includes('?') ? '&' : '?') + 'status=success';
+      let finalReturnUrl = returnUrl + (returnUrl.includes('?') ? '&' : '?') + 'status=success';
+      const customerEmail = params.get('customer_email');
+      const customerPhone = params.get('customer_phone');
+      if (customerEmail) finalReturnUrl += '&email=' + encodeURIComponent(customerEmail);
+      if (customerPhone) finalReturnUrl += '&phone=' + encodeURIComponent(customerPhone);
+      window.location.href = finalReturnUrl;
     } else if (callbackStatus === 'failed') {
       setStatus('Payment could not be verified. Please contact support if you were charged.', true);
       window.location.href = cancelUrl + (cancelUrl.includes('?') ? '&' : '?') + 'status=failed';
@@ -597,7 +602,10 @@
               const verifyData = await verifyRes.json();
               if (verifyRes.ok && verifyData.success) {
                 showSuccessScreen();
-                window.location.href = returnUrl + (returnUrl.includes('?') ? '&' : '?') + 'status=success';
+                let handlerReturnUrl = returnUrl + (returnUrl.includes('?') ? '&' : '?') + 'status=success';
+                if (customerEmailEl.value) handlerReturnUrl += '&email=' + encodeURIComponent(customerEmailEl.value);
+                if (customerPhoneEl.value) handlerReturnUrl += '&phone=' + encodeURIComponent(customerPhoneEl.value);
+                window.location.href = handlerReturnUrl;
               } else {
                 setStatus('Payment verification failed. Please contact support if you were charged.', true);
                 window.location.href = cancelUrl + (cancelUrl.includes('?') ? '&' : '?') + 'status=failed';
