@@ -108,21 +108,52 @@
   .btn-primary{ background:var(--capsule); color:#0c1530; }
   .btn-secondary{ background:rgba(255,255,255,.08); color:#fff; border:1px solid rgba(255,255,255,.28); }
 
-  /* ECG signature line */
-  .ecg-wrap{ max-width:640px; margin:44px auto 0; opacity:.85; }
-  .ecg-wrap svg{ width:100%; height:auto; display:block; }
-  .ecg-line{
-    fill:none; stroke:url(#ecgGradient); stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round;
-    stroke-dasharray:900; stroke-dashoffset:900;
-    animation:draw 3.2s ease-in-out infinite;
+  /* Aurora signature wave */
+  .aurora-wrap{
+    max-width:640px; min-height:130px; margin:44px auto 0; padding:20px 24px;
+    position:relative; overflow:hidden; border-radius:28px;
+    background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08);
+    display:flex; align-items:center; justify-content:center;
   }
-  @keyframes draw{
-    0%{ stroke-dashoffset:900; }
-    55%{ stroke-dashoffset:0; }
-    100%{ stroke-dashoffset:-900; }
+  .aurora-wrap::before{
+    content:''; position:absolute; inset:-40%;
+    background:
+      radial-gradient(38% 60% at 15% 45%, rgba(111,79,216,.55), transparent 70%),
+      radial-gradient(34% 55% at 50% 55%, rgba(169,140,255,.5), transparent 70%),
+      radial-gradient(38% 60% at 85% 40%, rgba(242,169,27,.42), transparent 70%);
+    filter:blur(18px);
+    animation:auroraDrift 9s ease-in-out infinite alternate;
+  }
+  .aurora-wrap::after{
+    content:''; position:absolute; inset:0;
+    background:linear-gradient(90deg, var(--navy-900) 0%, transparent 12%, transparent 88%, var(--navy-900) 100%);
+    pointer-events:none;
+  }
+  .aurora-label{
+    position:relative; z-index:2; display:flex; flex-direction:column; align-items:center; gap:8px;
+  }
+  .aurora-label .aurora-name{
+    display:flex; align-items:center; gap:10px;
+    font-family:'Fraunces', serif; font-weight:600;
+    font-size:clamp(1.92rem, 4.8vw, 2.88rem); letter-spacing:0; text-transform:none;
+    color:#f5f2ff;
+    animation:pulseGlow 2.6s ease-in-out infinite;
+  }
+  .aurora-label .tagline{
+    font-family:'Inter', Arial, sans-serif; font-weight:500; font-size:.86rem;
+    letter-spacing:.04em; color:var(--amber); text-transform:none;
+  }
+  @keyframes pulseGlow{
+    0%, 100%{ opacity:.78; text-shadow:0 0 6px rgba(169,140,255,.35), 0 0 0 rgba(242,169,27,0); }
+    50%{ opacity:1; text-shadow:0 0 24px rgba(169,140,255,.9), 0 0 46px rgba(242,169,27,.45); }
+  }
+  @keyframes auroraDrift{
+    0%{ transform:translateX(-6%) translateY(-3%) scale(1); }
+    50%{ transform:translateX(3%) translateY(4%) scale(1.08); }
+    100%{ transform:translateX(-3%) translateY(-4%) scale(1); }
   }
   @media (prefers-reduced-motion: reduce){
-    .ecg-line{ animation:none; stroke-dashoffset:0; }
+    .aurora-wrap::before, .aurora-label .aurora-name{ animation:none; }
     html{ scroll-behavior:auto; }
   }
 
@@ -241,8 +272,8 @@
   .contact-row .label{ display:block; font-size:.74rem; color:rgba(255,255,255,.55); text-transform:uppercase; letter-spacing:.06em; margin-bottom:2px; }
 
   footer{ background:var(--navy-900); color:rgba(255,255,255,.6); padding:36px 24px; }
-  .footer-inner{ max-width:1120px; margin:0 auto; display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; font-size:.86rem; }
-  .footer-inner a{ color:rgba(255,255,255,.75); text-decoration:none; margin-left:18px; }
+  .footer-inner{ max-width:1120px; margin:0 auto; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:12px; text-align:center; font-size:.86rem; }
+  .footer-inner a{ color:rgba(255,255,255,.75); text-decoration:none; margin:0 9px; }
   .footer-inner a:hover{ color:#fff; }
 
   a:focus-visible, button:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
@@ -321,17 +352,11 @@
         <button id="install-app-btn" class="btn btn-secondary" type="button" hidden>Install app</button>
       </div>
       <p style="margin-top: 18px; color: var(--muted); font-size: .95rem; line-height: 1.6;">Download the app first. Premium family-sharing unlocks later inside the app after purchase.</p>
-      <div class="ecg-wrap" aria-hidden="true">
-        <svg viewBox="0 0 640 90" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <linearGradient id="ecgGradient" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stop-color="#6f4fd8" />
-              <stop offset="55%" stop-color="#a98cff" />
-              <stop offset="100%" stop-color="#f2a91b" />
-            </linearGradient>
-          </defs>
-          <path class="ecg-line" d="M0,45 L110,45 L130,45 L145,15 L160,75 L175,45 L200,45 L360,45 L380,45 L395,20 L410,70 L425,45 L450,45 L640,45" />
-        </svg>
+      <div class="aurora-wrap" aria-hidden="true">
+        <div class="aurora-label">
+          <span class="aurora-name">TracMeds</span>
+          <span class="tagline">Your daily family health sharing app</span>
+        </div>
       </div>
     </div>
   </header>
@@ -780,17 +805,12 @@
 
   <footer>
     <div class="footer-inner">
-      <span>© 2026 TracMeds. All rights reserved.</span>
       <nav>
-        <a href="#privacy-policy">Privacy Policy</a>
         <a href="#terms">Terms</a>
         <a href="#refund-policy">Refund Policy</a>
-        <a href="mailto:support@tracmeds.com">support@tracmeds.com</a>
-        <a href="https://www.tracmeds.com">www.tracmeds.com</a>
+        <a href="#privacy-policy">Privacy Policy</a>
       </nav>
-    </div>
-    <div class="footer-inner" style="margin-top:14px; font-size:.85rem; color:rgba(255,255,255,.65);">
-      <span>TracMeds - Your daily family health sharing app </span>
+      <span>© 2026 TracMeds. All rights reserved.</span>
     </div>
   </footer>
 
