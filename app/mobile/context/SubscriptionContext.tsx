@@ -7,6 +7,7 @@ import { cancelDailyReportReminder } from '@/utils/notifications';
 export const PREMIUM_ENTITLEMENT_ID = 'premium';
 const STORAGE_KEY = '@tracmeds:isPro';
 const SUBSCRIPTION_RECORD_KEY = '@tracmeds:subscriptionRecord';
+const DEVICE_ID_KEY = '@tracmeds:deviceId';
 // Use the backend-hosted checkout route so the details form, Razorpay callback,
 // invoice email, and Google Sheets bookkeeping stay on the same controlled path.
 const CHECKOUT_BASE_URL = 'https://website-tracmeds-backend-on-render.onrender.com/checkout';
@@ -31,6 +32,34 @@ interface SubscriptionRecord {
   expiresAt: string;    // ISO date string computed at purchase time
   updatedAt: string;
   supportNote: string;
+  // Captured off the Razorpay checkout return link so later lifecycle events
+  // (renewed/expired) can still identify the customer for device tracking.
+  customerEmail?: string;
+  customerPhone?: string;
+}
+
+// Generates a lightweight per-install identifier (not cryptographically
+// strong — this is only used to cap how many devices share one plan, not
+// for security). Persisted once so it's stable across app restarts.
+function generateDeviceId(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+async function getOrCreateDeviceId(): Promise<string> {
+  try {
+    const existing = await AsyncStorage.getItem(DEVICE_ID_KEY);
+    if (existing) return existing;
+    const created = generateDeviceId();
+    await AsyncStorage.setItem(DEVICE_ID_KEY, created);
+    return created;
+  } catch {
+    // Storage failure — fall back to a per-session id rather than blocking the caller.
+    return generateDeviceId();
+  }
 }
 
 const DEFAULT_PACKAGES = [
@@ -109,9 +138,24 @@ function getCheckoutUrl(pkg: SubscriptionPackage) {
   return `${CHECKOUT_BASE_URL}?plan=${resolvedPlan}&return_url=${encodeURIComponent(returnUrl)}&cancel_url=${encodeURIComponent(cancelUrl)}&v=${cacheBuster}`;
 }
 
-async function saveSubscriptionRecord(pkg: SubscriptionPackage, status: SubscriptionRecord['status']): Promise<SubscriptionRecord> {
+async function saveSubscriptionRecord(
+  pkg: SubscriptionPackage,
+  status: SubscriptionRecord['status'],
+  identity?: { email?: string; phone?: string },
+): Promise<SubscriptionRecord> {
   const now = new Date();
   const expiresAt = computeExpiresAt(pkg.identifier, now);
+  // Preserve any previously-known email/phone (e.g. from the original purchase)
+  // when a later event, like expiry, doesn't carry fresh identity of its own.
+  let previousIdentity: { customerEmail?: string; customerPhone?: string } = {};
+  try {
+    const stored = await AsyncStorage.getItem(SUBSCRIPTION_RECORD_KEY);
+    if (stored) {
+      const prior: SubscriptionRecord = JSON.parse(stored);
+      previousIdentity = { customerEmail: prior.customerEmail, customerPhone: prior.customerPhone };
+    }
+  } catch { /* ignore — fall back to whatever identity was passed in */ }
+
   const record: SubscriptionRecord = {
     plan: pkg.identifier,
     title: pkg.title,
@@ -121,6 +165,8 @@ async function saveSubscriptionRecord(pkg: SubscriptionPackage, status: Subscrip
     expiresAt,
     updatedAt: now.toISOString(),
     supportNote: 'Family sharing access is managed through the app and can be reviewed for support or refund requests.',
+    customerEmail: identity?.email || previousIdentity.customerEmail,
+    customerPhone: identity?.phone || previousIdentity.customerPhone,
   };
   await AsyncStorage.setItem(SUBSCRIPTION_RECORD_KEY, JSON.stringify(record));
   return record;
@@ -138,20 +184,28 @@ function reportSubscriptionEventToServer(
   userName?: string,
 ) {
   try {
-    fetch('https://website-tracmeds-backend-on-render.onrender.com/api/subscription-event', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        user: userName ?? '',
-        plan: record.plan,
-        purchasedAt: record.startedAt,
-        expiresAt: record.expiresAt,
-        status,
-        // Lets the sheet distinguish a brand-new subscriber from a renewal.
-        isRenewal: hadPriorExpiredRecord,
-      }),
-    }).catch(() => {
-      // non-blocking — ignore network failures
+    // Fire-and-forget, but still resolve the device id first — the server
+    // only writes to the Devices sheet when deviceId AND (email or phone)
+    // are present on the request body.
+    getOrCreateDeviceId().then((deviceId) => {
+      fetch('https://website-tracmeds-backend-on-render.onrender.com/api/subscription-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user: userName ?? '',
+          plan: record.plan,
+          purchasedAt: record.startedAt,
+          expiresAt: record.expiresAt,
+          status,
+          // Lets the sheet distinguish a brand-new subscriber from a renewal.
+          isRenewal: hadPriorExpiredRecord,
+          deviceId,
+          email: record.customerEmail,
+          phone: record.customerPhone,
+        }),
+      }).catch(() => {
+        // non-blocking — ignore network failures
+      });
     });
   } catch {
     // non-blocking
@@ -213,8 +267,13 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       if (!url) return;
       const normalized = url.toLowerCase();
       let statusParam = '';
+      let emailParam: string | undefined;
+      let phoneParam: string | undefined;
       try {
-        statusParam = (new URL(url).searchParams.get('status') || '').toLowerCase();
+        const parsed = new URL(url);
+        statusParam = (parsed.searchParams.get('status') || '').toLowerCase();
+        emailParam = parsed.searchParams.get('email') || undefined;
+        phoneParam = parsed.searchParams.get('phone') || undefined;
       } catch {
         // Ignore parse failures and keep fallback checks below.
       }
@@ -240,7 +299,10 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
             } catch { /* corrupted — treat as new */ }
           }
 
-          const record = await saveSubscriptionRecord(planFromUrl as SubscriptionPackage, 'active');
+          const record = await saveSubscriptionRecord(planFromUrl as SubscriptionPackage, 'active', {
+            email: emailParam,
+            phone: phoneParam,
+          });
           setExpiresAt(record.expiresAt);
           setIsPro(true);
 
