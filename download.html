@@ -24,6 +24,7 @@
       --navy-900: #0c1530;
       --violet: #6f4fd8;
       --amber: #f2a91b;
+      --blue: #0b3d91;
       --paper: #f2f4fb;
       --card: #ffffff;
       --muted: #5c6785;
@@ -98,6 +99,26 @@
     .status-box strong { color: var(--ink); }
     ul { margin: 10px 0 0 18px; color: var(--muted); line-height: 1.7; }
     .footer-note { font-size: 0.92rem; margin-top: 22px; }
+    .btn[aria-disabled="true"] {
+      opacity: 0.55;
+      cursor: not-allowed;
+      pointer-events: none;
+      filter: grayscale(35%);
+    }
+    .countdown-box {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(111, 79, 216, 0.10);
+      border: 1px solid rgba(111, 79, 216, 0.25);
+      color: var(--violet);
+      font-weight: 700;
+      font-size: 0.92rem;
+      padding: 10px 16px;
+      border-radius: 999px;
+      margin: 4px 0 20px;
+    }
+    .countdown-box[hidden] { display: none; }
     @media (max-width: 640px) {
       .card { padding: 24px; }
       .actions { flex-direction: column; }
@@ -109,27 +130,31 @@
   <main class="card">
     <a href="/index.html" style="display: inline-flex; align-items: center; gap: 10px; margin-bottom: 16px; text-decoration: none;">
       <img src="/icon.png" alt="TracMeds" style="width: 56px; height: 56px; border-radius: 14px;" />
-      <span style="font-family: 'Fraunces', Georgia, serif; font-size: 1.5rem; font-weight: 600; color: var(--ink);">TracMeds</span>
+      <span style="font-family: 'Fraunces', Georgia, serif; font-size: 1.5rem; font-weight: 600; color: var(--blue);">TracMeds</span>
     </a>
     <div class="badge">✓ Thank you</div>
-    <h1>Download TracMeds</h1>
+    <h1 style="color: var(--blue);">Download TracMeds</h1>
     <p>Download TracMeds and install it on your Android phone.</p>
     <p>A Mac desktop app is coming soon.</p>
 
+    <div id="countdownBox" class="countdown-box">⏳ Unlocks tonight at 10:00 PM IST — <span id="countdownText">calculating…</span></div>
+
     <div class="actions">
-      <a class="btn btn-primary" href="https://github.com/anurmarc22/website-tracmeds/releases/download/v5.0.0/tracmeds.v5.0.0.apk" download="tracmeds.apk" rel="noopener">Download for Android</a>
-      <a class="btn btn-secondary" href="https://github.com/anurmarc22/website-tracmeds/releases/download/v5.0.0/tracmeds.v5.0.0.apk" target="_blank" rel="noopener noreferrer">Trouble downloading? Try this instead</a>
+      <a id="btnPrimary" class="btn btn-primary" href="#" aria-disabled="true" download="tracmeds.apk" rel="noopener">Available at 10 PM</a>
+      <a id="btnSecondary" class="btn btn-secondary" href="#" aria-disabled="true" target="_blank" rel="noopener noreferrer">Available at 10 PM</a>
     </div>
 
-    <p style="margin-top: 8px; color: var(--muted);">If the download does not start automatically, use the “Trouble downloading?” link or right-click the button and choose Save link as.</p>
+    <p style="margin-top: 8px; color: var(--muted);">Once it's live, if the download does not start automatically, use the “Trouble downloading?” link or right-click the button and choose Save link as.</p>
 
     <div class="status-box">
-      <strong>How to install</strong>
+      <strong>How to install — for Android phones only</strong>
       <ul>
         <li>Open the downloaded APK file from your phone’s Downloads folder.</li>
         <li>If prompted, allow installation from this source.</li>
         <li>Tap Install and open TracMeds once it finishes.</li>
       </ul>
+      <p style="margin-top: 8px; color: var(--muted);">Works on all major Android brands — Samsung, Xiaomi, Realme, OnePlus, Vivo, Oppo, Motorola, Nothing, Google Pixel, Poco, iQOO, Infinix, Tecno, Honor, Asus, Lava, Micromax & more.</p>
+      <p style="margin-top: 8px;"><strong>Coming soon on iOS.</strong></p>
       <p style="margin-top: 8px;">The app includes premium family-sharing access that can be unlocked later through the in-app purchase flow, with subscription records managed inside the app.</p>
       <p style="margin-top: 8px;"><a href="mailto:support@tracmeds.com" style="color: var(--violet); font-weight: 700;">support@tracmeds.com</a></p>
     </div>
@@ -156,6 +181,59 @@
         console.warn('Cache cleanup failed', error);
       });
     }
+  </script>
+  <script>
+    // ---- Launch gate: buttons stay inert until 8:00 PM IST tonight ----
+    // The real APK URL is intentionally kept out of href until unlock,
+    // so it can't be triggered early by clicking, "Save link as", or
+    // reading the page source before launch.
+    var REAL_APK_URL = "https://github.com/anurmarc22/website-tracmeds/releases/download/v5.0.0/tracmeds.v5.0.0.apk";
+    var LAUNCH_TIME_UTC = "2026-08-07T16:30:00Z"; // 10:00 PM IST, Aug 7 2026
+
+    (function () {
+      var launch = new Date(LAUNCH_TIME_UTC).getTime();
+      var btnPrimary = document.getElementById('btnPrimary');
+      var btnSecondary = document.getElementById('btnSecondary');
+      var countdownBox = document.getElementById('countdownBox');
+      var countdownText = document.getElementById('countdownText');
+
+      function unlock() {
+        btnPrimary.href = REAL_APK_URL;
+        btnPrimary.removeAttribute('aria-disabled');
+        btnPrimary.textContent = 'Download for Android';
+
+        btnSecondary.href = REAL_APK_URL;
+        btnSecondary.removeAttribute('aria-disabled');
+        btnSecondary.textContent = 'Trouble downloading? Try this instead';
+
+        countdownBox.setAttribute('hidden', '');
+      }
+
+      function tick() {
+        var now = Date.now();
+        var diff = launch - now;
+
+        if (diff <= 0) {
+          unlock();
+          clearInterval(timer);
+          return;
+        }
+
+        var h = Math.floor(diff / 3600000);
+        var m = Math.floor((diff % 3600000) / 60000);
+        var s = Math.floor((diff % 60000) / 1000);
+        var pad = function (n) { return String(n).padStart(2, '0'); };
+        countdownText.textContent = pad(h) + 'h ' + pad(m) + 'm ' + pad(s) + 's';
+      }
+
+      // If someone loads the page after launch time, unlock immediately.
+      if (Date.now() >= launch) {
+        unlock();
+      } else {
+        tick();
+        var timer = setInterval(tick, 1000);
+      }
+    })();
   </script>
 </body>
 </html>
