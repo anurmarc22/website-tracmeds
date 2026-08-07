@@ -14,6 +14,28 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+
+// Keep the checkout page on the branded domain so it matches what's
+// registered with Razorpay (see Business website details). The app itself
+// still opens the onrender.com URL — this just 302-redirects those two
+// checkout routes over to checkout.tracmeds.com, carrying the full query
+// string (plan, return_url, cancel_url, etc.) along with it. Every other
+// route (APIs, index.html, etc.) is untouched and keeps working on
+// onrender.com exactly as before.
+const CHECKOUT_BRAND_HOST = 'checkout.tracmeds.com';
+const CHECKOUT_REDIRECT_PATHS = new Set(['/checkout', '/razorpay-checkout.html']);
+app.use((req, res, next) => {
+  if (
+    req.method === 'GET' &&
+    CHECKOUT_REDIRECT_PATHS.has(req.path) &&
+    req.hostname !== CHECKOUT_BRAND_HOST
+  ) {
+    const queryString = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+    return res.redirect(302, `https://${CHECKOUT_BRAND_HOST}${req.path}${queryString}`);
+  }
+  next();
+});
+
 app.use(express.static(__dirname));
 
 const restoreRateLimiter = rateLimit({
