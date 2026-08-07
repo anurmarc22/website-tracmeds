@@ -1078,11 +1078,17 @@ app.post('/api/payment-callback', async (req, res) => {
   // tracmeds:// deep link. That page already has success/fail card UI and
   // the JS that attempts the app handoff — a raw server-side 302 straight
   // to a custom URL scheme is what was causing "Safari can't open the page".
-  const checkoutPageUrl = (status) => {
+  const checkoutPageUrl = (status, extra = {}) => {
     const url = new URL('/razorpay-checkout.html', SERVER_BASE);
     url.searchParams.set('callback_status', status);
     url.searchParams.set('return_url', returnUrl);
     url.searchParams.set('cancel_url', cancelUrl);
+    // Carry the customer's email/phone through the redirect so the app can
+    // report them back with the subscription event — the Devices sheet
+    // needs deviceId + (email or phone) to record a device, and the app
+    // has no other way to know which customer this checkout belonged to.
+    if (extra.email) url.searchParams.set('customer_email', extra.email);
+    if (extra.phone) url.searchParams.set('customer_phone', extra.phone);
     return url.toString();
   };
 
@@ -1101,8 +1107,8 @@ app.post('/api/payment-callback', async (req, res) => {
 
   // Signature verified — now build the invoice/ledger/email, same as /api/verify-payment,
   // since this redirect-flow path bypasses that route entirely.
+  let notes = {};
   try {
-    let notes = {};
     if (req.query.customer_data) {
       notes = JSON.parse(Buffer.from(decodeURIComponent(req.query.customer_data), 'base64').toString('utf8'));
     }
@@ -1137,7 +1143,7 @@ app.post('/api/payment-callback', async (req, res) => {
     // the payment itself is already verified and successful at this point.
   }
 
-  return res.redirect(302, checkoutPageUrl('success'));
+  return res.redirect(302, checkoutPageUrl('success', { email: notes.email, phone: notes.phone }));
 });
 
 // Appends a subscription lifecycle event (active, renewed, expired) to the
