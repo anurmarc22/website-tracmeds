@@ -83,6 +83,7 @@ const METRIC_META: Record<MetricType, { label: string; icon: string; colorKey: M
   heart_rate: { label: 'Heart Rate', icon: 'heart-flash', colorKey: 'heartRateColor' },
   blood_sugar: { label: 'Blood Sugar', icon: 'water', colorKey: 'sugarColor' },
   menstrual: { label: 'Menstrual', icon: 'gender-female', colorKey: 'menstrualColor' },
+  exercise: { label: 'Exercise', icon: 'run-fast', colorKey: 'weightColor' },
   weight: { label: 'Weight', icon: 'scale-bathroom', colorKey: 'weightColor' },
   temperature: { label: 'Temperature', icon: 'thermometer', colorKey: 'tempColor' },
 };
@@ -93,6 +94,14 @@ function getMetricValue(log: HealthLog): string {
     case 'heart_rate': return log.value1 ? `${log.value1} BPM` : '—';
     case 'blood_sugar': return log.value1 ? `${log.value1} mg/dL${log.label ? ` (${log.label})` : ''}` : '—';
     case 'menstrual': return log.label ?? (log.value1 ? `Day ${log.value1}` : 'Logged');
+    case 'exercise': {
+    if (!log.value1) return '—';
+    const totalMinutes = Math.round(log.value1);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    const duration = hours > 0 && minutes > 0 ? `${hours}h ${minutes}m` : hours > 0 ? `${hours}h` : `${minutes}m`;
+    return `${duration}${log.label ? ` (${log.label})` : ''}`;
+  }
     case 'weight': return log.value1 ? `${log.value1} ${log.label ?? 'kg'}` : '—';
     case 'temperature': return log.value1 ? `${log.value1}${log.label ?? '°C'}` : '—';
   }
@@ -101,10 +110,11 @@ function getMetricValue(log: HealthLog): string {
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { appointments, healthLogs, medicines, addAppointment, addHealthLog, addMedicine, profile } = useApp();
+  const { appointments, healthLogs, medicines, addAppointment, addHealthLog, updateHealthLog, addMedicine, profile } = useApp();
   const [showApptModal, setShowApptModal] = useState(false);
   const [showHealthModal, setShowHealthModal] = useState(false);
   const [showMedModal, setShowMedModal] = useState(false);
+  const [healthModalDefaultType, setHealthModalDefaultType] = useState<MetricType>('bp');
 
   const isWeb = Platform.OS === 'web';
   const topPad = isWeb ? 67 : insets.top;
@@ -117,7 +127,7 @@ export default function HomeScreen() {
   for (const log of healthLogs) {
     if (!latestByType[log.type]) latestByType[log.type] = log;
   }
-  const summaryMetrics: MetricType[] = ['bp', 'heart_rate', 'blood_sugar', 'menstrual'];
+  const summaryMetrics: MetricType[] = ['bp', 'heart_rate', 'blood_sugar', 'menstrual', 'exercise'];
 
   const timePeriod = getTimePeriod();
   const greetingText = getGreetingText(profile.name, timePeriod);
@@ -175,7 +185,7 @@ export default function HomeScreen() {
             <Text style={[s.quickBtnText, { color: colors.foreground }]}>Appointment</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[s.quickBtn, { backgroundColor: colors.bpColor + '12', borderColor: colors.bpColor + '25' }]}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowHealthModal(true); }}>
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setHealthModalDefaultType('bp'); setShowHealthModal(true); }}>
             <View style={[s.quickBtnIcon, { backgroundColor: colors.bpColor }]}>
               <Ionicons name="pulse" size={18} color="#fff" />
             </View>
@@ -244,7 +254,7 @@ export default function HomeScreen() {
             const log = latestByType[key];
             const mColor = colors[meta.colorKey];
             return (
-              <TouchableOpacity key={key} style={s.metricCard} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowHealthModal(true); }} activeOpacity={0.85}>
+              <TouchableOpacity key={key} style={s.metricCard} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setHealthModalDefaultType(key); setShowHealthModal(true); }} activeOpacity={0.85}>
                 <View style={[s.metricIcon, { backgroundColor: mColor + '18' }]}>
                   <MaterialCommunityIcons name={meta.icon as any} size={20} color={mColor} />
                 </View>
@@ -255,6 +265,18 @@ export default function HomeScreen() {
                   <Text style={s.metricEmpty}>No data</Text>
                 )}
                 {log && <Text style={s.metricDate}>{formatDate(log.date)}</Text>}
+                {key === 'exercise' && log ? (
+                  <TouchableOpacity
+                    style={[s.metricToggle, { backgroundColor: log.completed ? colors.success : colors.muted }]}
+                    onPress={(event) => {
+                      event.stopPropagation();
+                      updateHealthLog(log.id, { completed: !Boolean(log.completed) });
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[s.metricToggleText, { color: log.completed ? '#fff' : colors.foreground }]}>{log.completed ? 'Done' : 'Not done'}</Text>
+                  </TouchableOpacity>
+                ) : null}
               </TouchableOpacity>
             );
           })}
@@ -262,7 +284,7 @@ export default function HomeScreen() {
       </ScrollView>
 
       <AppointmentModal visible={showApptModal} onClose={() => setShowApptModal(false)} onSave={addAppointment} />
-      <HealthLogModal visible={showHealthModal} onClose={() => setShowHealthModal(false)} onSave={addHealthLog} />
+      <HealthLogModal visible={showHealthModal} defaultType={healthModalDefaultType} onClose={() => setShowHealthModal(false)} onSave={addHealthLog} />
       <MedicineModal visible={showMedModal} onClose={() => setShowMedModal(false)} onSave={addMedicine} />
     </View>
   );
@@ -281,9 +303,9 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
       shadowRadius: 14,
       elevation: 5,
     },
-    brandRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
-    brandIcon: { width: 14, height: 14, borderRadius: 3 },
-    brandWord: { fontSize: 12, fontFamily: 'Inter_700Bold', color: 'rgba(255,255,255,0.85)', letterSpacing: 0.8, textTransform: 'uppercase' },
+    brandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+    brandIcon: { width: 18, height: 18, borderRadius: 4, flexShrink: 0 },
+    brandWord: { fontSize: 14, fontFamily: 'Inter_700Bold', color: 'rgba(255,255,255,0.85)', letterSpacing: 0.8, textTransform: 'uppercase' },
     heroTextWrap: { width: '100%', marginBottom: 10 },
     greeting: { fontSize: 24, fontFamily: 'Inter_700Bold', color: '#fff', marginBottom: 4, maxWidth: '100%' },
     quote: { fontSize: 13, fontFamily: 'Inter_500Medium', color: 'rgba(255,255,255,0.85)', lineHeight: 18, maxWidth: '100%' },
@@ -326,5 +348,7 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     metricValue: { fontSize: 15, fontFamily: 'Inter_700Bold' },
     metricEmpty: { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.mutedForeground },
     metricDate: { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.mutedForeground },
+    metricToggle: { marginTop: 8, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, alignSelf: 'center' },
+    metricToggleText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
   });
 }
