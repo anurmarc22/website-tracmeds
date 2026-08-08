@@ -48,6 +48,7 @@ interface AppContextValue {
   // Health logs
   healthLogs: HealthLog[];
   addHealthLog: (l: Omit<HealthLog, 'id' | 'createdAt'>) => Promise<void>;
+  updateHealthLog: (id: string, data: Partial<HealthLog>) => Promise<void>;
   deleteHealthLog: (id: string) => Promise<void>;
 
   // Medicines
@@ -80,6 +81,7 @@ interface AppContextValue {
   sendDailyReport: (contactIds?: string[]) => void;
   doseLog: DoseRecord[];
   markDoseStatus: (medicineId: string, time: string, status: DoseRecord['status']) => void;
+  clearDoseStatus: (medicineId: string, time: string) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -120,7 +122,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (logs) setHealthLogs(JSON.parse(logs));
         if (meds) setMedicines(JSON.parse(meds));
         if (ctcts) setContacts(JSON.parse(ctcts));
-        if (prof) setProfile(JSON.parse(prof));
+        if (prof) {
+          try {
+            const parsed = JSON.parse(prof) as UserProfile;
+            let mutated = { ...parsed };
+            if (typeof mutated.menstrualCycleLength === 'number') mutated.menstrualCycleLength = Math.min(60, Math.max(14, mutated.menstrualCycleLength));
+            if (typeof mutated.menstrualPeriodLength === 'number') mutated.menstrualPeriodLength = Math.min(60, Math.max(1, mutated.menstrualPeriodLength));
+            // sanitize lastPeriodStart if present (expect YYYY-MM-DD)
+            if (mutated.lastPeriodStart && !/^\d{4}-\d{2}-\d{2}$/.test(mutated.lastPeriodStart)) mutated.lastPeriodStart = undefined;
+            setProfile(mutated);
+            // persist if altered
+            if (JSON.stringify(mutated) !== prof) {
+              AsyncStorage.setItem(KEYS.PROFILE, JSON.stringify(mutated));
+            }
+          } catch {
+            setProfile(JSON.parse(prof));
+          }
+        }
         if (reportCfg) setReportSettings({ ...DEFAULT_REPORT_SETTINGS, ...JSON.parse(reportCfg) });
         if (doseLogData) setDoseLog(JSON.parse(doseLogData));
       } catch {
@@ -185,6 +203,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const item: HealthLog = { ...data, id: genId(), createdAt: new Date().toISOString() };
     setHealthLogs(prev => {
       const updated = [item, ...prev];
+      AsyncStorage.setItem(KEYS.HEALTH_LOGS, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const updateHealthLog = useCallback(async (id: string, data: Partial<HealthLog>) => {
+    setHealthLogs(prev => {
+      const updated = prev.map(log => log.id === id ? { ...log, ...data } : log);
       AsyncStorage.setItem(KEYS.HEALTH_LOGS, JSON.stringify(updated));
       return updated;
     });
@@ -262,9 +288,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Profile
   const updateProfile = useCallback(async (data: Partial<UserProfile>) => {
     setProfile(prev => {
-      const updated = { ...prev, ...data };
-      AsyncStorage.setItem(KEYS.PROFILE, JSON.stringify(updated));
-      return updated;
+      const merged = { ...prev, ...data } as UserProfile;
+      // clamp menstrual settings
+      if (typeof merged.menstrualCycleLength === 'number') merged.menstrualCycleLength = Math.min(60, Math.max(14, merged.menstrualCycleLength));
+      if (typeof merged.menstrualPeriodLength === 'number') merged.menstrualPeriodLength = Math.min(60, Math.max(1, merged.menstrualPeriodLength));
+      if (merged.lastPeriodStart && !/^\d{4}-\d{2}-\d{2}$/.test(merged.lastPeriodStart)) merged.lastPeriodStart = undefined;
+      AsyncStorage.setItem(KEYS.PROFILE, JSON.stringify(merged));
+      return merged;
     });
   }, []);
 
@@ -277,7 +307,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const todayISO = () => new Date().toISOString().split('T')[0];
+  const todayISO = () => {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
+  };
 
   const markDoseStatus = useCallback((medicineId: string, time: string, status: DoseRecord['status']) => {
     setDoseLog(prev => {
@@ -287,6 +320,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...withoutExisting,
         { medicineId, date, time, status, recordedAt: new Date().toISOString() },
       ];
+      AsyncStorage.setItem(KEYS.DOSE_LOG, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const clearDoseStatus = useCallback((medicineId: string, time: string) => {
+    setDoseLog(prev => {
+      const date = todayISO();
+      const updated = prev.filter(d => !(d.medicineId === medicineId && d.date === date && d.time === time));
       AsyncStorage.setItem(KEYS.DOSE_LOG, JSON.stringify(updated));
       return updated;
     });
@@ -316,6 +358,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => subscription?.remove();
   }, [markDoseStatus]);
 
+  const formatExerciseDuration = useCallback((minutesValue?: number) => {
+    const totalMinutes = Math.max(0, Math.round(minutesValue ?? 0));
+    if (totalMinutes <= 0) return '0 min';
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    if (hours > 0 && minutes === 0) return `${hours} hr${hours === 1 ? '' : 's'}`;
+    if (hours > 0 && minutes > 0) return `${hours} hr ${minutes} min`;
+    return `${minutes} min`;
+  }, []);
+
   const buildDailyReportMessage = useCallback((): string => {
     const today = todayISO();
     let msg = `🗓️ *Tracmeds Daily Report*\n${profile.name ? `for ${profile.name}\n` : ''}\n`;
@@ -326,8 +378,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       msg += `💊 *Medicines* (${active.length} active)\n`;
       if (active.length > 0) {
         active.forEach(m => {
-          const times = m.times.length > 0 ? m.times.map(formatTime12).join(', ') : '';
-          msg += `• ${m.name} — ${m.dosage} ${m.unit}${times ? ` (${times})` : ''}\n`;
+          if (m.times.length > 0) {
+            m.times.forEach(t => {
+              const formattedTime = formatTime12(t);
+              const dose = doseLog.find(d => d.medicineId === m.id && d.date === today && d.time === t);
+              const status = dose ? (dose.status === 'taken' ? 'Taken' : 'Snoozed') : 'Not taken';
+              msg += `• ${m.name} — ${m.dosage} ${m.unit} @ ${formattedTime} — ${status}\n`;
+            });
+          } else {
+            msg += `• ${m.name} — ${m.dosage} ${m.unit} — Not scheduled today\n`;
+          }
         });
       } else {
         msg += `No active medicines.\n`;
@@ -373,7 +433,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       msg += `❤️ *Today's Readings*\n`;
       if (todaysLogs.length > 0) {
         todaysLogs.forEach(l => {
-          const val = l.type === 'bp' ? `${l.value1}/${l.value2} mmHg` : `${l.value1 ?? ''} ${l.label ?? ''}`.trim();
+          let val = l.type === 'bp' ? `${l.value1}/${l.value2} mmHg` : `${l.value1 ?? ''} ${l.label ?? ''}`.trim();
+          if (l.type === 'exercise') {
+            const duration = formatExerciseDuration(l.value1);
+            const statusLabel = l.completed === true ? 'Done' : l.completed === false ? 'Not done' : 'Status not set';
+            val = `${duration}${l.label ? ` (${l.label})` : ''} — ${statusLabel}`;
+          }
           msg += `• ${l.type.replace('_', ' ')}: ${val}\n`;
         });
       } else {
@@ -386,7 +451,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!hasContent) msg += `No categories selected for this report.\n`;
     msg += `_Sent via Tracmeds_`;
     return msg;
-  }, [reportSettings, medicines, appointments, healthLogs, profile.name, doseLog]);
+  }, [reportSettings, medicines, appointments, healthLogs, profile.name, doseLog, formatExerciseDuration]);
 
   // WhatsApp helpers
   const shareViaWhatsApp = useCallback((phone: string, message: string) => {
@@ -460,13 +525,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const typeLabels: Record<string, string> = {
       bp: 'Blood Pressure', heart_rate: 'Heart Rate',
       blood_sugar: 'Blood Sugar', menstrual: 'Menstrual Cycle',
-      weight: 'Weight', temperature: 'Temperature',
+      exercise: 'Exercise', weight: 'Weight', temperature: 'Temperature',
     };
     let valueStr = '';
     if (log.type === 'bp') valueStr = `${log.value1}/${log.value2} mmHg`;
     else if (log.type === 'heart_rate') valueStr = `${log.value1} BPM`;
     else if (log.type === 'blood_sugar') valueStr = `${log.value1} mg/dL${log.label ? ` (${log.label})` : ''}`;
     else if (log.type === 'menstrual') valueStr = log.label ?? `Day ${log.value1}`;
+    else if (log.type === 'exercise') {
+      const duration = formatExerciseDuration(log.value1);
+      const status = log.completed === true ? 'Done' : log.completed === false ? 'Not done' : 'Status not set';
+      valueStr = `${duration}${log.label ? ` (${log.label})` : ''} — ${status}`;
+    }
     else if (log.type === 'weight') valueStr = `${log.value1} ${log.label ?? 'kg'}`;
     else if (log.type === 'temperature') valueStr = `${log.value1}${log.label ?? '°C'}`;
 
@@ -493,7 +563,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const ids = contactIdsOverride ?? reportSettings.contactIds;
     const targetContacts = contacts.filter(c => ids.includes(c.id));
     if (targetContacts.length === 0) {
-      Alert.alert('No Recipients', 'Choose who should receive the daily report in Profile.');
+      Alert.alert(
+        'No report recipients selected',
+        'Choose recipients in Profile > Family sharing > Send report to before sending the daily report.'
+      );
       return;
     }
     const msg = buildDailyReportMessage();
@@ -511,6 +584,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       deleteAppointment,
       healthLogs,
       addHealthLog,
+      updateHealthLog,
       deleteHealthLog,
       medicines,
       addMedicine,
@@ -533,6 +607,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       sendDailyReport,
       doseLog,
       markDoseStatus,
+      clearDoseStatus,
     }}>
       {children}
     </AppContext.Provider>
