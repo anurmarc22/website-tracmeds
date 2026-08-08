@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { Linking } from 'react-native';
+import { Linking, AppState } from 'react-native';
 import * as ExpoLinking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { cancelDailyReportReminder } from '@/utils/notifications';
@@ -183,11 +183,13 @@ function reportSubscriptionEventToServer(
   hadPriorExpiredRecord: boolean,
   userName?: string,
 ) {
+  console.log('[reportSubscriptionEventToServer] called', { status, plan: record.plan, email: record.customerEmail, phone: record.customerPhone });
   try {
     // Fire-and-forget, but still resolve the device id first — the server
     // only writes to the Devices sheet when deviceId AND (email or phone)
     // are present on the request body.
     getOrCreateDeviceId().then((deviceId) => {
+      console.log('[reportSubscriptionEventToServer] got deviceId, sending fetch', deviceId);
       fetch('https://website-tracmeds-backend-on-render.onrender.com/api/subscription-event', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -203,12 +205,16 @@ function reportSubscriptionEventToServer(
           email: record.customerEmail,
           phone: record.customerPhone,
         }),
-      }).catch(() => {
-        // non-blocking — ignore network failures
+      }).then((res) => {
+        console.log('[reportSubscriptionEventToServer] fetch resolved, status:', res.status);
+      }).catch((err) => {
+        console.log('[reportSubscriptionEventToServer] fetch FAILED:', err?.message || err);
       });
+    }).catch((err) => {
+      console.log('[reportSubscriptionEventToServer] getOrCreateDeviceId FAILED:', err?.message || err);
     });
-  } catch {
-    // non-blocking
+  } catch (err) {
+    console.log('[reportSubscriptionEventToServer] outer try/catch FAILED:', err);
   }
 }
 
@@ -269,34 +275,47 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       let statusParam = '';
       let emailParam: string | undefined;
       let phoneParam: string | undefined;
+      let pathname = '';
       try {
         const parsed = new URL(url);
         statusParam = (parsed.searchParams.get('status') || '').toLowerCase();
         emailParam = parsed.searchParams.get('email') || undefined;
         phoneParam = parsed.searchParams.get('phone') || undefined;
+        pathname = parsed.pathname.toLowerCase();
       } catch {
         // Ignore parse failures and keep fallback checks below.
       }
 
-      const isSuccess = normalized.includes('success') || normalized.includes('paid') || statusParam === 'success';
-      const isCancel = normalized.includes('cancel') || statusParam === 'cancel' || statusParam === 'failed';
+      const isCompleteRoute = pathname.includes('/payment/complete') || normalized.includes('payment/complete');
+      const isCancelRoute = pathname.includes('/payment/cancel') || normalized.includes('payment/cancel');
+      const isSuccess =
+        statusParam === 'success' ||
+        statusParam === 'paid' ||
+        normalized.includes('status=success') ||
+        normalized.includes('success') ||
+        normalized.includes('paid') ||
+        (isCompleteRoute && !isCancelRoute && !['cancel', 'failed'].includes(statusParam));
+      const isCancel =
+        statusParam === 'cancel' ||
+        statusParam === 'failed' ||
+        isCancelRoute ||
+        normalized.includes('status=cancel') ||
+        normalized.includes('status=failed');
 
       if (isSuccess) {
         try {
           await AsyncStorage.setItem(STORAGE_KEY, 'true');
-          // Determine which plan was purchased from deep-link params if possible;
-          // otherwise default to monthly (safest conservative default).
           const planFromUrl = normalized.includes('annual') ? DEFAULT_PACKAGES[0] : DEFAULT_PACKAGES[1];
 
-          // Check whether a prior expired record exists — used to distinguish
-          // a brand-new subscriber from a renewal in the Google Sheet.
           const storedRecord = await AsyncStorage.getItem(SUBSCRIPTION_RECORD_KEY);
           let hadPriorExpiredRecord = false;
           if (storedRecord) {
             try {
               const prior: SubscriptionRecord = JSON.parse(storedRecord);
               hadPriorExpiredRecord = prior.status === 'expired';
-            } catch { /* corrupted — treat as new */ }
+            } catch {
+              // corrupted — treat as new
+            }
           }
 
           const record = await saveSubscriptionRecord(planFromUrl as SubscriptionPackage, 'active', {
@@ -306,7 +325,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
           setExpiresAt(record.expiresAt);
           setIsPro(true);
 
-          // Log active or renewed event to Google Sheets via the server.
+          console.log('[handleDeepLink] about to call reportSubscriptionEventToServer', { emailParam, phoneParam });
           reportSubscriptionEventToServer(
             record,
             hadPriorExpiredRecord ? 'renewed' : 'active',
@@ -331,9 +350,25 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       }
     };
 
+    const handleAppStateChange = async (nextState: string) => {
+      if (nextState !== 'active') return;
+      try {
+        const url = await Linking.getInitialURL();
+        if (url) {
+          await handleDeepLink(url);
+        }
+      } catch {
+        // Ignore resume-time parsing issues.
+      }
+    };
+
     Linking.getInitialURL().then(handleDeepLink);
     const subscription = Linking.addEventListener('url', ({ url }) => handleDeepLink(url));
-    return () => subscription.remove();
+    const appStateSub = AppState.addEventListener('change', handleAppStateChange);
+    return () => {
+      subscription.remove();
+      appStateSub?.remove();
+    };
   }, []);
 
   // While the app is open, continuously enforce expiry so access is revoked
