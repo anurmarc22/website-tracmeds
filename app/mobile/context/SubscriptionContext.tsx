@@ -10,7 +10,7 @@ const SUBSCRIPTION_RECORD_KEY = '@tracmeds:subscriptionRecord';
 const DEVICE_ID_KEY = '@tracmeds:deviceId';
 // Use the backend-hosted checkout route so the details form, Razorpay callback,
 // invoice email, and Google Sheets bookkeeping stay on the same controlled path.
-const CHECKOUT_BASE_URL = 'https://website-tracmeds-backend-on-render.onrender.com/checkout';
+const CHECKOUT_BASE_URL = 'https://checkout.tracmeds.com/checkout';
 
 // Expiry durations — client-side enforcement only.
 // NOTE: This is a one-time-charge setup (not recurring billing), so expiry is
