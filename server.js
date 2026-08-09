@@ -12,7 +12,17 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 app.use(cors());
-app.use(bodyParser.json());
+// The Razorpay webhook route needs the RAW request body (exact bytes) to
+// verify the X-Razorpay-Signature header — parsing to JSON and re-serializing
+// can change the byte content and break signature verification. Every other
+// route keeps using the normal JSON body parser.
+app.use((req, res, next) => {
+  if (req.path === '/api/webhooks/razorpay') {
+    express.raw({ type: 'application/json' })(req, res, next);
+  } else {
+    bodyParser.json()(req, res, next);
+  }
+});
 app.use(bodyParser.urlencoded({ extended: true }));
 
 // The app already opens the branded checkout URL directly, so avoid adding an
@@ -30,6 +40,24 @@ const restoreRateLimiter = rateLimit({
     error: 'Too many restore attempts. Please try again shortly.',
   },
 });
+
+// Higher allowance than restore — this gets called on every app foreground
+// and on a background timer, not just on manual user action.
+const statusRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: 'Too many status checks. Please try again shortly.',
+  },
+});
+
+// Set in Razorpay Dashboard → Settings → Webhooks when creating the webhook,
+// then copy the same value into this env var on Render. Distinct from
+// RAZORPAY_KEY_SECRET — this one is only used to verify webhook payloads.
+const RAZORPAY_WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET;
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
@@ -106,48 +134,112 @@ function highestSequenceFromInvoiceNumbers(invoiceNumbers, invoicePrefix) {
   return highest;
 }
 
-// Render's local disk is NOT persistent across redeploys/restarts — ledger.json
-// resets, which would silently restart invoice numbering at 0001. Google Sheets
-// is the durable record, so the real next-number lookup reads the Sheet's
-// "Invoice Number" column and takes the max against the local ledger too (in
-// case a very recent entry hasn't made it into the Sheet yet for any reason).
-async function getNextInvoiceNumber(prefix = 'TRACMEDS', year = new Date().getFullYear()) {
-  const invoicePrefix = `${prefix}-${year}-`;
-  let highestFromSheet = 0;
+// --- Invoice creation lock -------------------------------------------------
+// A single successful payment can reach invoice creation from TWO independent
+// routes: the client-side handler (/api/verify-payment) and Razorpay's own
+// server-to-server callback (/api/payment-callback). Both used to call
+// getNextInvoiceNumber() + appendLedgerEntry() completely independently, with
+// no coordination between them. That's a read-then-write race on a single
+// Node process: if two invoice-number lookups both run before either has
+// written its result back, they can both compute the SAME "next" number
+// (duplicate invoice numbers for two different rows), or the same payment can
+// get two different invoice numbers and two invoice emails.
+//
+// This queue forces every invoice-number lookup + reservation to run one at a
+// time, in order, within this process. Because Node is single-threaded and
+// this is a single Render web service (no horizontal scaling), a promise
+// chain is sufficient — no external lock/DB needed.
+let invoiceCreationQueue = Promise.resolve();
+function withInvoiceLock(task) {
+  const result = invoiceCreationQueue.then(task, task);
+  // Keep the queue alive even if a task throws, so later requests still run.
+  invoiceCreationQueue = result.then(() => {}, () => {});
+  return result;
+}
 
-  const sheets = getSheetsClient();
-  if (sheets) {
-    try {
-      const sheetName = GOOGLE_SHEET_RANGE.split('!')[0] || 'Sheet1';
-      const response = await sheets.spreadsheets.values.get({
-        spreadsheetId: GOOGLE_SHEET_ID,
-        range: `${sheetName}!A:Z`,
-      });
-      const rows = response.data.values || [];
-      if (rows.length > 1) {
-        const header = rows[0] || [];
-        const invoiceIndex = header.findIndex(
-          (col) => String(col || '').trim().toLowerCase() === 'invoice number'
-        );
-        if (invoiceIndex !== -1) {
-          const invoiceNumbers = rows.slice(1).map((row) => row[invoiceIndex]);
-          highestFromSheet = highestSequenceFromInvoiceNumbers(invoiceNumbers, invoicePrefix);
-        }
-      }
-    } catch (error) {
-      console.warn('Unable to read invoice numbers from Google Sheet; falling back to local ledger only.', error.message);
+// Finds an already-created invoice for this exact Razorpay payment, or
+// creates + reserves a new sequential invoice number for it. Returns
+// { invoice, isNew }. Callers should only append to the Sheet / send the
+// invoice email when isNew is true — this is what makes the dual
+// verify-payment / payment-callback paths safe to both call this function
+// for the same payment without producing two invoices.
+async function resolveInvoiceForPayment({ paymentId, buildParams, prefix = 'TRACMEDS', year = new Date().getFullYear() }) {
+  return withInvoiceLock(async () => {
+    // Fast path: local ledger. Covers the common case where both invoice
+    // paths for the same payment fire within the same server lifetime.
+    const ledgerEntries = getLedgerEntries();
+    const ledgerMatch = ledgerEntries.find((entry) => entry.paymentId === paymentId);
+    if (ledgerMatch) {
+      return { invoice: ledgerMatch, isNew: false };
     }
-  }
 
-  const entries = getLedgerEntries();
-  const highestFromLedger = highestSequenceFromInvoiceNumbers(
-    entries.map((entry) => entry.invoiceNumber),
-    invoicePrefix
-  );
+    const invoicePrefix = `${prefix}-${year}-`;
+    let highestFromSheet = 0;
 
-  const highest = Math.max(highestFromSheet, highestFromLedger);
-  const nextSequence = String(highest + 1).padStart(4, '0');
-  return `${invoicePrefix}${nextSequence}`;
+    // Slow path: check the Sheet directly. This covers the rarer case of a
+    // Render restart between the two invoice-creation attempts (which would
+    // reset the local ledger, but the Sheet — the durable record — still has
+    // the row from the first attempt). Reusing this same Sheet read to also
+    // find the current highest invoice number avoids a second round trip.
+    const sheets = getSheetsClient();
+    if (sheets) {
+      try {
+        const sheetName = GOOGLE_SHEET_RANGE.split('!')[0] || 'Sheet1';
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId: GOOGLE_SHEET_ID,
+          range: `${sheetName}!A:Z`,
+        });
+        const rows = response.data.values || [];
+        if (rows.length > 1) {
+          const header = rows[0] || [];
+          const invoiceIndex = header.findIndex(
+            (col) => String(col || '').trim().toLowerCase() === 'invoice number'
+          );
+          const paymentIdIndex = header.findIndex(
+            (col) => String(col || '').trim().toLowerCase() === 'payment id'
+          );
+
+          if (paymentIdIndex !== -1) {
+            const sheetMatch = rows.slice(1).find(
+              (row) => String(row[paymentIdIndex] || '') === String(paymentId)
+            );
+            if (sheetMatch) {
+              return {
+                invoice: {
+                  invoiceNumber: invoiceIndex !== -1 ? sheetMatch[invoiceIndex] : undefined,
+                  paymentId,
+                },
+                isNew: false,
+              };
+            }
+          }
+
+          if (invoiceIndex !== -1) {
+            const invoiceNumbers = rows.slice(1).map((row) => row[invoiceIndex]);
+            highestFromSheet = highestSequenceFromInvoiceNumbers(invoiceNumbers, invoicePrefix);
+          }
+        }
+      } catch (error) {
+        console.warn('Unable to read Google Sheet while resolving invoice; falling back to local ledger only.', error.message);
+      }
+    }
+
+    const highestFromLedger = highestSequenceFromInvoiceNumbers(
+      ledgerEntries.map((entry) => entry.invoiceNumber),
+      invoicePrefix
+    );
+
+    const highest = Math.max(highestFromSheet, highestFromLedger);
+    const nextSequence = String(highest + 1).padStart(4, '0');
+    const invoiceNumber = `${invoicePrefix}${nextSequence}`;
+
+    const invoice = buildInvoiceData({ ...buildParams, paymentId, invoiceNumber });
+    // Synchronous local write, still inside the lock — this is what lets the
+    // *next* queued call see this payment (and this invoice number) as
+    // already taken, even before the slower Sheet append has happened.
+    appendLedgerEntry(invoice);
+    return { invoice, isNew: true };
+  });
 }
 
 function appendLedgerEntry(invoice) {
@@ -223,6 +315,63 @@ function evaluateDeviceAccessPolicy(existingDeviceIds, incomingDeviceId) {
   return { allowed: true, added: !alreadyExists, deviceIds: uniqueDevices };
 }
 
+// Converts a 0-based column index to its spreadsheet letter (0 -> 'A', 26 -> 'AA', ...).
+function columnLetter(index) {
+  let n = index + 1;
+  let letters = '';
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    letters = String.fromCharCode(65 + rem) + letters;
+    n = Math.floor((n - 1) / 26);
+  }
+  return letters;
+}
+
+// Ensures each name in requiredHeaders exists somewhere in sheetName's header
+// row, appending any that are missing at the end — WITHOUT touching or
+// reordering any existing columns. This is what lets us add "Refund Status"
+// and "ClearedAt" to already-populated production sheets safely, instead of
+// requiring a manual spreadsheet edit. Always call this AFTER the sheet's own
+// base header-creation function (ensureSheetHeaderRow / ensureDevicesHeaderRow)
+// so there's a guarantee the header row is never genuinely empty here.
+// Returns a lowercase-header-name -> column-index map for the full header row.
+async function ensureHeaderColumns(sheets, sheetName, requiredHeaders) {
+  const wideRange = `${sheetName}!A1:ZZ1`;
+  let currentHeader = [];
+  try {
+    const response = await sheets.spreadsheets.values.get({ spreadsheetId: GOOGLE_SHEET_ID, range: wideRange });
+    currentHeader = (response.data.values && response.data.values[0]) || [];
+  } catch (error) {
+    currentHeader = [];
+  }
+
+  const normalizedCurrent = currentHeader.map((cell) => String(cell || '').trim().toLowerCase());
+  const missing = requiredHeaders.filter((name) => !normalizedCurrent.includes(name.toLowerCase()));
+
+  if (missing.length > 0) {
+    const startIndex = currentHeader.length;
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `${sheetName}!${columnLetter(startIndex)}1:${columnLetter(startIndex + missing.length - 1)}1`,
+      valueInputOption: 'RAW',
+      requestBody: { values: [missing] },
+    });
+    currentHeader = [...currentHeader, ...missing];
+  }
+
+  const indexMap = {};
+  currentHeader.forEach((name, index) => {
+    const key = String(name || '').trim().toLowerCase();
+    if (key) indexMap[key] = index;
+  });
+  return indexMap;
+}
+
+async function ensureRefundColumns(sheets) {
+  const sheetName = GOOGLE_SHEET_RANGE.split('!')[0] || 'Sheet1';
+  return ensureHeaderColumns(sheets, sheetName, ['Refund Status', 'Refunded At']);
+}
+
 async function ensureSheetExists(sheets, sheetName) {
   try {
     const response = await sheets.spreadsheets.get({ spreadsheetId: GOOGLE_SHEET_ID });
@@ -249,16 +398,20 @@ async function ensureDevicesHeaderRow(sheets) {
     if (rows.length === 0 || rows[0].every((cell) => cell === '')) {
       await sheets.spreadsheets.values.update({
         spreadsheetId: GOOGLE_SHEET_ID,
-        range: headerRange,
+        range: `${sheetName}!A1:D1`,
         valueInputOption: 'RAW',
         requestBody: {
-          values: [['AccessKey', 'DeviceId', 'AddedAt']],
+          values: [['AccessKey', 'DeviceId', 'AddedAt', 'ClearedAt']],
         },
       });
+      return;
     }
   } catch (err) {
     // ignore — sheet may not exist or client not configured
   }
+  // Existing production header (AccessKey/DeviceId/AddedAt already there) —
+  // add ClearedAt if missing, without disturbing existing columns/rows.
+  await ensureHeaderColumns(sheets, sheetName, ['ClearedAt']);
 }
 
 async function getDevicesFromSheet(accessKey) {
@@ -266,7 +419,7 @@ async function getDevicesFromSheet(accessKey) {
   if (!sheets || !accessKey) return [];
 
   const sheetName = 'Devices';
-  const lookupRange = `${sheetName}!A:C`;
+  const lookupRange = `${sheetName}!A:D`;
 
   try {
     const response = await sheets.spreadsheets.values.get({
@@ -280,10 +433,13 @@ async function getDevicesFromSheet(accessKey) {
     const header = rows[0] || [];
     const keyIndex = header.findIndex((col) => String(col || '').trim().toLowerCase() === 'accesskey');
     const deviceIndex = header.findIndex((col) => String(col || '').trim().toLowerCase() === 'deviceid');
+    const clearedIndex = header.findIndex((col) => String(col || '').trim().toLowerCase() === 'clearedat');
     if (keyIndex === -1 || deviceIndex === -1) return [];
 
     return rows.slice(1).reduce((devices, row) => {
       if (String(row[keyIndex] || '').trim().toLowerCase() === accessKey.toLowerCase()) {
+        const isCleared = clearedIndex !== -1 && String(row[clearedIndex] || '').trim() !== '';
+        if (isCleared) return devices; // refunded — no longer counts toward the 3-device cap
         const deviceId = String(row[deviceIndex] || '').trim();
         if (deviceId) devices.push(deviceId);
       }
@@ -292,6 +448,63 @@ async function getDevicesFromSheet(accessKey) {
   } catch (error) {
     console.warn('Unable to read devices from Google Sheet', error.message);
     return [];
+  }
+}
+
+// Marks all of a customer's current Devices rows as cleared (soft-delete) on
+// refund. Keeps the rows — and the audit trail — intact, but frees up a full
+// fresh 3-device allowance the moment they buy again, rather than the old
+// refunded period's devices counting against a brand-new purchase.
+async function softClearDevicesForAccessKey(accessKey) {
+  const sheets = getSheetsClient();
+  if (!sheets || !accessKey) return { success: false, reason: 'missing_google_sheets_configuration' };
+
+  try {
+    await ensureDevicesHeaderRow(sheets);
+    const sheetName = 'Devices';
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `${sheetName}!A:D`,
+    });
+
+    const rows = response.data.values || [];
+    if (rows.length < 2) return { success: true, cleared: 0 };
+
+    const header = rows[0] || [];
+    const keyIndex = header.findIndex((col) => String(col || '').trim().toLowerCase() === 'accesskey');
+    const clearedIndex = header.findIndex((col) => String(col || '').trim().toLowerCase() === 'clearedat');
+    if (keyIndex === -1 || clearedIndex === -1) return { success: false, reason: 'missing_columns' };
+
+    const clearedAtValue = new Date().toISOString();
+    const dataForBatch = [];
+
+    for (let i = 1; i < rows.length; i += 1) {
+      const row = rows[i] || [];
+      const isMatch = String(row[keyIndex] || '').trim().toLowerCase() === accessKey.toLowerCase();
+      const alreadyCleared = String(row[clearedIndex] || '').trim() !== '';
+      if (isMatch && !alreadyCleared) {
+        const sheetRowNumber = i + 1; // rows[0] is the header, so data row i is sheet row i+1
+        dataForBatch.push({
+          range: `${sheetName}!${columnLetter(clearedIndex)}${sheetRowNumber}`,
+          values: [[clearedAtValue]],
+        });
+      }
+    }
+
+    if (dataForBatch.length === 0) return { success: true, cleared: 0 };
+
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      requestBody: {
+        valueInputOption: 'RAW',
+        data: dataForBatch,
+      },
+    });
+
+    return { success: true, cleared: dataForBatch.length };
+  } catch (error) {
+    console.error('Unable to soft-clear devices in Google Sheet', error);
+    return { success: false, reason: 'google_sheets_error', error: error.message };
   }
 }
 
@@ -329,7 +542,7 @@ async function findLedgerEntryInSheet(email, phone) {
   if (!wantedEmail || !wantedPhone) return null;
 
   const sheetName = (GOOGLE_SHEET_RANGE.split('!')[0] || 'Sheet1');
-  const lookupRange = `${sheetName}!A:Z`;
+  const lookupRange = `${sheetName}!A:AC`;
 
   try {
     const response = await sheets.spreadsheets.values.get({
@@ -354,6 +567,8 @@ async function findLedgerEntryInSheet(email, phone) {
     const invoiceIndex = headerMap.get('invoice number');
     const paymentIdIndex = headerMap.get('payment id');
     const customerNameIndex = headerMap.get('customer name');
+    const refundStatusIndex = headerMap.get('refund status');
+    const refundedAtIndex = headerMap.get('refunded at');
 
     if (emailIndex === undefined || phoneIndex === undefined) {
       return null;
@@ -375,6 +590,8 @@ async function findLedgerEntryInSheet(email, phone) {
         invoiceNumber: row[invoiceIndex] || '',
         paymentId: row[paymentIdIndex] || '',
         customerName: row[customerNameIndex] || '',
+        refundStatus: refundStatusIndex !== undefined ? row[refundStatusIndex] || '' : '',
+        refundedAt: refundedAtIndex !== undefined ? row[refundedAtIndex] || '' : '',
       });
     }
 
@@ -385,6 +602,84 @@ async function findLedgerEntryInSheet(email, phone) {
   } catch (error) {
     console.warn('restore lookup from sheet failed', error);
     return null;
+  }
+}
+
+// Looks up a Sheet1 row by Razorpay payment ID — used by the refund webhook,
+// which only knows the payment, not the customer's email/phone up front.
+async function findLedgerRowByPaymentId(paymentId) {
+  const sheets = getSheetsClient();
+  if (!sheets || !paymentId) return null;
+
+  const sheetName = GOOGLE_SHEET_RANGE.split('!')[0] || 'Sheet1';
+  const lookupRange = `${sheetName}!A:AC`;
+
+  try {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: lookupRange,
+    });
+
+    const rows = response.data.values || [];
+    if (rows.length < 2) return null;
+
+    const header = rows[0] || [];
+    const headerMap = new Map();
+    header.forEach((col, index) => {
+      const key = String(col || '').trim().toLowerCase();
+      if (key) headerMap.set(key, index);
+    });
+
+    const paymentIdIndex = headerMap.get('payment id');
+    if (paymentIdIndex === undefined) return null;
+
+    for (let i = 1; i < rows.length; i += 1) {
+      const row = rows[i] || [];
+      if (String(row[paymentIdIndex] || '') === String(paymentId)) {
+        return {
+          sheetRowNumber: i + 1, // rows[0] is the header, so data row i is sheet row i+1
+          customerEmail: row[headerMap.get('customer email')] || '',
+          customerPhone: row[headerMap.get('customer phone')] || '',
+          customerName: row[headerMap.get('customer name')] || '',
+          plan: row[headerMap.get('plan')] || '',
+          invoiceNumber: row[headerMap.get('invoice number')] || '',
+          amount: row[headerMap.get('amount (inr)')] || '',
+          currency: row[headerMap.get('currency')] || '',
+          refundStatus: headerMap.has('refund status') ? row[headerMap.get('refund status')] || '' : '',
+        };
+      }
+    }
+    return null;
+  } catch (error) {
+    console.warn('Lookup by payment id failed', error);
+    return null;
+  }
+}
+
+// Writes 'Refunded' + a timestamp into the matched row's Refund Status /
+// Refunded At cells. This becomes the single source of truth that both
+// restore-subscription and subscription-status read from.
+async function markInvoiceRefundedInSheet(sheetRowNumber) {
+  const sheets = getSheetsClient();
+  if (!sheets) return { success: false, reason: 'missing_google_sheets_configuration' };
+
+  try {
+    const sheetName = GOOGLE_SHEET_RANGE.split('!')[0] || 'Sheet1';
+    const indexMap = await ensureRefundColumns(sheets);
+    const refundStatusCol = columnLetter(indexMap['refund status']);
+    const refundedAtCol = columnLetter(indexMap['refunded at']);
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `${sheetName}!${refundStatusCol}${sheetRowNumber}:${refundedAtCol}${sheetRowNumber}`,
+      valueInputOption: 'RAW',
+      requestBody: { values: [['Refunded', new Date().toISOString()]] },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Unable to mark invoice refunded in Google Sheet', error);
+    return { success: false, reason: 'google_sheets_error', error: error.message };
   }
 }
 
@@ -404,7 +699,7 @@ function getSheetsClient() {
 
 async function ensureSheetHeaderRow(sheets) {
   const sheetName = GOOGLE_SHEET_RANGE.split('!')[0] || 'Sheet1';
-  const headerRange = `${sheetName}!A1:AA1`;
+  const headerRange = `${sheetName}!A1:AC1`;
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: GOOGLE_SHEET_ID,
     range: headerRange,
@@ -440,6 +735,8 @@ async function ensureSheetHeaderRow(sheets) {
       'Currency',
       'Seller Name',
       'Seller GSTIN',
+      'Refund Status',
+      'Refunded At',
     ];
 
     await sheets.spreadsheets.values.update({
@@ -461,6 +758,10 @@ async function appendTransactionToSheet(invoice) {
 
   try {
     await ensureSheetHeaderRow(sheets);
+    // Migrates the already-populated production header (which predates the
+    // refund feature) to include these two columns, without disturbing any
+    // existing columns or rows. No-ops once they're already present.
+    await ensureRefundColumns(sheets);
 
     const values = [
       new Date().toISOString(),
@@ -490,6 +791,8 @@ async function appendTransactionToSheet(invoice) {
       invoice.currency,
       invoice.sellerName,
       invoice.sellerGstin,
+      '', // Refund Status — blank until/unless this payment is refunded
+      '', // Refunded At
     ];
 
     await sheets.spreadsheets.values.append({
@@ -648,9 +951,11 @@ function buildInvoiceData({ name, phone, email, address, gstRequired, gstin, amo
   const sgstAmountNum = gstApplies && intraState ? Number((taxTotalNum / 2).toFixed(2)) : 0;
   const igstAmountNum = gstApplies && !intraState ? Number(taxTotalNum.toFixed(2)) : 0;
   const payoutEstimate = calculatePayoutEstimate({ amount });
-  // invoiceNumber is computed by the caller (async, via getNextInvoiceNumber
-  // against the Google Sheet + local ledger) and passed in here. The local-only
-  // fallback below only fires if a caller forgets to pass one in.
+  // invoiceNumber is computed by the caller (async, via resolveInvoiceForPayment,
+  // which runs under the invoice creation lock against the Sheet + local ledger)
+  // and passed in here. The local-only fallback below is NOT lock-protected — it
+  // only exists as a safety net if a caller forgets to pass a number in, and
+  // should not be relied on for concurrent invoice creation.
   const resolvedInvoiceNumber = invoiceNumber || (() => {
     const entries = getLedgerEntries();
     const invoicePrefix = `TRACMEDS-${new Date().getFullYear()}-`;
@@ -990,6 +1295,72 @@ async function sendInvoiceEmail(invoice) {
   }
 }
 
+function buildRefundEmailHtml({ customerName, invoiceNumber, amount, currency, refundedAt }) {
+  const dateDisplay = new Date(refundedAt).toLocaleDateString('en-IN');
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TracMeds Refund Confirmation</title>
+</head>
+<body style="margin:0; padding:24px; background:#f3f4f6;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px; margin:0 auto; border-collapse:collapse;">
+  <tr>
+    <td style="border:1px solid #e5e7eb; border-radius:12px; background:#ffffff;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td style="padding:24px; font-family:Arial, sans-serif; color:#12193a;">
+            <p style="margin:0 0 4px 0; font-size:22px; font-weight:700;">TracMeds</p>
+            <p style="margin:0 0 20px 0; color:#5c6785; font-size:14px;">Refund Confirmation</p>
+            <p style="margin:0 0 12px 0; font-size:14px;">Hi ${customerName || 'there'},</p>
+            <p style="margin:0 0 12px 0; font-size:14px;">Your payment against invoice <strong>${invoiceNumber || 'N/A'}</strong> has been refunded in full. Family sharing access on your account has been deactivated as of this refund.</p>
+            <p style="margin:0 0 12px 0; font-size:14px;">Refunded Amount: <strong>${amount || 'N/A'} ${currency || 'INR'}</strong></p>
+            <p style="margin:0 0 12px 0; font-size:14px;">Refund Date: ${dateDisplay}</p>
+            <p style="margin:20px 0 0 0; color:#5c6785; font-size:12px;">If you'd like to resume family sharing, you're welcome to purchase a new plan any time from within the app.</p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>`;
+}
+
+async function sendRefundEmail({ customerEmail, customerName, invoiceNumber, amount, currency, refundedAt }) {
+  if (!resend) {
+    console.warn('RESEND_API_KEY not configured; skipping refund email send.');
+    return { success: false, reason: 'missing_resend_api_key' };
+  }
+  if (!customerEmail) {
+    console.warn('No customer email available; skipping refund email send.');
+    return { success: false, reason: 'missing_customer_email' };
+  }
+
+  const html = buildRefundEmailHtml({ customerName, invoiceNumber, amount, currency, refundedAt });
+
+  try {
+    const result = await resend.emails.send({
+      from: process.env.EMAIL_FROM || 'TracMeds <invoices@tracmeds.com>',
+      to: customerEmail,
+      bcc: process.env.INVOICE_BCC_EMAIL,
+      subject: `TracMeds Refund Confirmation${invoiceNumber ? ' — ' + invoiceNumber : ''}`,
+      html,
+    });
+
+    if (result.error) {
+      console.error('Resend API returned an error sending refund email', result.error);
+      return { success: false, reason: 'resend_api_error', error: result.error };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error sending refund email via Resend', error);
+    return { success: false, reason: 'send_exception', error: error.message };
+  }
+}
+
 // Fields required to build and email an invoice. Enforced here, before an
 // order is even created, so incomplete checkout data can't reach Razorpay —
 // this is a server-side backstop for the same validation the checkout page
@@ -1054,29 +1425,34 @@ async function handleVerifyPayment(req, res) {
     .update(razorpay_order_id + '|' + razorpay_payment_id)
     .digest('hex');
   if (generated_signature === razorpay_signature) {
-    const invoiceNumber = await getNextInvoiceNumber('TRACMEDS', new Date().getFullYear());
-    const invoice = buildInvoiceData({
-      name: notes.name,
-      phone: notes.phone,
-      email: notes.email,
-      address: notes.address,
-      placeOfSupply: notes.place_of_supply,
-      gstRequired: notes.gst_required === 'yes',
-      gstin: notes.gstin,
-      amount: notes.amount || 0,
-      currency: notes.currency || 'INR',
-      plan: notes.plan,
+    const { invoice, isNew } = await resolveInvoiceForPayment({
       paymentId: razorpay_payment_id,
-      orderId: razorpay_order_id,
-      receipt: notes.receipt,
-      invoiceNumber,
+      buildParams: {
+        name: notes.name,
+        phone: notes.phone,
+        email: notes.email,
+        address: notes.address,
+        placeOfSupply: notes.place_of_supply,
+        gstRequired: notes.gst_required === 'yes',
+        gstin: notes.gstin,
+        amount: notes.amount || 0,
+        currency: notes.currency || 'INR',
+        plan: notes.plan,
+        orderId: razorpay_order_id,
+        receipt: notes.receipt,
+      },
     });
-    appendLedgerEntry(invoice);
-    const sheetResult = await appendTransactionToSheet(invoice);
-    if (!sheetResult.success) {
-      console.warn('Google Sheets bookkeeping record could not be appended.', sheetResult);
+
+    if (isNew) {
+      const sheetResult = await appendTransactionToSheet(invoice);
+      if (!sheetResult.success) {
+        console.warn('Google Sheets bookkeeping record could not be appended.', sheetResult);
+      }
+      await sendInvoiceEmail(invoice);
+    } else {
+      console.log('Invoice already exists for payment (payment-callback path likely ran first); skipping duplicate sheet row/email.', razorpay_payment_id);
     }
-    await sendInvoiceEmail(invoice);
+
     return res.json({ success: true, invoice });
   }
   return res.status(400).json({ success: false, error: 'Signature mismatch' });
@@ -1104,12 +1480,15 @@ app.post('/api/payment-callback', async (req, res) => {
     url.searchParams.set('callback_status', status);
     url.searchParams.set('return_url', returnUrl);
     url.searchParams.set('cancel_url', cancelUrl);
-    // Carry the customer's email/phone through the redirect so the app can
+    // Carry the customer's email/phone/plan through the redirect so the app can
     // report them back with the subscription event — the Devices sheet
     // needs deviceId + (email or phone) to record a device, and the app
-    // has no other way to know which customer this checkout belonged to.
+    // has no other way to know which customer or plan this checkout belonged
+    // to (this is a fresh page load with none of the original checkout
+    // page's in-memory state).
     if (extra.email) url.searchParams.set('customer_email', extra.email);
     if (extra.phone) url.searchParams.set('customer_phone', extra.phone);
+    if (extra.plan) url.searchParams.set('customer_plan', extra.plan);
     return url.toString();
   };
 
@@ -1134,37 +1513,40 @@ app.post('/api/payment-callback', async (req, res) => {
       notes = JSON.parse(Buffer.from(decodeURIComponent(req.query.customer_data), 'base64').toString('utf8'));
     }
 
-    const invoiceNumber = await getNextInvoiceNumber('TRACMEDS', new Date().getFullYear());
-    const invoice = buildInvoiceData({
-      name: notes.name,
-      phone: notes.phone,
-      email: notes.email,
-      address: notes.address,
-      placeOfSupply: notes.place_of_supply,
-      gstRequired: notes.gst_required === 'yes',
-      gstin: notes.gstin,
-      amount: notes.amount || 0,
-      currency: notes.currency || 'INR',
-      plan: notes.plan,
+    const { invoice, isNew } = await resolveInvoiceForPayment({
       paymentId: razorpay_payment_id,
-      orderId: razorpay_order_id,
-      receipt: notes.receipt,
-      invoiceNumber,
+      buildParams: {
+        name: notes.name,
+        phone: notes.phone,
+        email: notes.email,
+        address: notes.address,
+        placeOfSupply: notes.place_of_supply,
+        gstRequired: notes.gst_required === 'yes',
+        gstin: notes.gstin,
+        amount: notes.amount || 0,
+        currency: notes.currency || 'INR',
+        plan: notes.plan,
+        orderId: razorpay_order_id,
+        receipt: notes.receipt,
+      },
     });
 
-    appendLedgerEntry(invoice);
-    const sheetResult = await appendTransactionToSheet(invoice);
-    if (!sheetResult.success) {
-      console.warn('Google Sheets bookkeeping record could not be appended.', sheetResult);
+    if (isNew) {
+      const sheetResult = await appendTransactionToSheet(invoice);
+      if (!sheetResult.success) {
+        console.warn('Google Sheets bookkeeping record could not be appended.', sheetResult);
+      }
+      await sendInvoiceEmail(invoice);
+    } else {
+      console.log('Invoice already exists for payment (verify-payment path likely ran first); skipping duplicate sheet row/email.', razorpay_payment_id);
     }
-    await sendInvoiceEmail(invoice);
   } catch (error) {
     console.error('Error building invoice during payment-callback redirect flow', error);
     // Don't block the user's redirect just because invoice/ledger logging failed —
     // the payment itself is already verified and successful at this point.
   }
 
-  return res.redirect(302, checkoutPageUrl('success', { email: notes.email, phone: notes.phone }));
+  return res.redirect(302, checkoutPageUrl('success', { email: notes.email, phone: notes.phone, plan: notes.plan }));
 });
 
 // Appends a subscription lifecycle event (active, renewed, expired) to the
@@ -1276,6 +1658,140 @@ app.post('/api/subscription-expired', async (req, res) => {
   return res.json({ success: true });
 });
 
+// Fires automatically from Razorpay whenever a refund is processed — including
+// refunds issued manually from the Razorpay Dashboard, not just via API. This
+// is what lets the refund flow work without you having to update anything
+// yourself: mark Sheet1, soft-clear the customer's device slots, email them a
+// confirmation. Configure in Razorpay Dashboard → Settings → Webhooks, URL
+// pointing here, subscribed to the "refund.processed" event, with a secret
+// matching RAZORPAY_WEBHOOK_SECRET on Render.
+app.post('/api/webhooks/razorpay', async (req, res) => {
+  if (!RAZORPAY_WEBHOOK_SECRET) {
+    console.error('RAZORPAY_WEBHOOK_SECRET not configured; rejecting webhook.');
+    return res.status(500).json({ success: false, error: 'webhook_not_configured' });
+  }
+
+  // req.body is a raw Buffer here (see the body-parser branch near the top of
+  // this file) — required for a byte-accurate HMAC signature check.
+  const signature = req.headers['x-razorpay-signature'];
+  const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body || {}));
+  const expectedSignature = crypto
+    .createHmac('sha256', RAZORPAY_WEBHOOK_SECRET)
+    .update(rawBody)
+    .digest('hex');
+
+  if (!signature || signature !== expectedSignature) {
+    console.warn('Razorpay webhook signature mismatch — rejecting.');
+    return res.status(400).json({ success: false, error: 'invalid_signature' });
+  }
+
+  let event;
+  try {
+    event = JSON.parse(rawBody.toString('utf8'));
+  } catch (error) {
+    return res.status(400).json({ success: false, error: 'invalid_payload' });
+  }
+
+  // Acknowledge (2xx) any event we're not subscribed to act on, so Razorpay
+  // doesn't keep retrying it.
+  if (event.event !== 'refund.processed') {
+    return res.json({ success: true, ignored: true });
+  }
+
+  try {
+    const refundEntity = event.payload?.refund?.entity;
+    const paymentEntity = event.payload?.payment?.entity;
+    const paymentId = refundEntity?.payment_id;
+    const refundStatus = paymentEntity?.refund_status; // 'full' | 'partial'
+
+    if (!paymentId) {
+      return res.json({ success: true, ignored: true, reason: 'missing_payment_id' });
+    }
+
+    // Only full refunds revoke access — matches how refunds are actually
+    // issued here (always manually, always in full, from the Dashboard).
+    if (refundStatus !== 'full') {
+      console.log(`Refund webhook for payment ${paymentId}: refund_status is "${refundStatus}", not "full" — not revoking access.`);
+      return res.json({ success: true, ignored: true, reason: 'not_full_refund' });
+    }
+
+    const ledgerRow = await findLedgerRowByPaymentId(paymentId);
+    if (!ledgerRow) {
+      console.warn(`Refund webhook for payment ${paymentId}: no matching Sheet1 row found.`);
+      return res.json({ success: true, ignored: true, reason: 'no_matching_row' });
+    }
+
+    if (String(ledgerRow.refundStatus || '').trim().toLowerCase() === 'refunded') {
+      // Already processed (Razorpay retried the webhook) — don't double-clear
+      // devices or send a second refund email.
+      return res.json({ success: true, alreadyProcessed: true });
+    }
+
+    const markResult = await markInvoiceRefundedInSheet(ledgerRow.sheetRowNumber);
+    if (!markResult.success) {
+      console.warn('Unable to mark invoice as refunded in Sheet1', markResult);
+    }
+
+    const accessKey = `${normalizeEmail(ledgerRow.customerEmail)}:${normalizePhone(ledgerRow.customerPhone)}`;
+    const clearResult = await softClearDevicesForAccessKey(accessKey);
+    if (!clearResult.success) {
+      console.warn('Unable to soft-clear devices for refunded customer', clearResult);
+    }
+
+    await sendRefundEmail({
+      customerEmail: ledgerRow.customerEmail,
+      customerName: ledgerRow.customerName,
+      invoiceNumber: ledgerRow.invoiceNumber,
+      amount: ledgerRow.amount,
+      currency: ledgerRow.currency,
+      refundedAt: new Date().toISOString(),
+    });
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Error processing refund webhook', error);
+    // Non-2xx so Razorpay's own webhook retry mechanism retries automatically —
+    // better than silently losing a refund event to a transient Sheets API hiccup.
+    return res.status(500).json({ success: false, error: 'processing_error' });
+  }
+});
+
+// Polled by the app (on foreground + on a background timer) so a refund can
+// revoke access mid-subscription, not just at the next reinstall/restore.
+app.post('/api/subscription-status', statusRateLimiter, async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    const phone = normalizePhone(req.body?.phone);
+
+    if (!email || !phone) {
+      return res.status(400).json({ success: false, error: 'Both email and phone are required.' });
+    }
+
+    const latest = await findLedgerEntryInSheet(email, phone);
+    if (!latest) {
+      return res.json({ success: true, found: false, active: false, refunded: false });
+    }
+
+    const refunded = String(latest.refundStatus || '').trim().toLowerCase() === 'refunded';
+    const plan = String(latest.plan || 'monthly').toLowerCase();
+    const startedAt = latest.timestamp ? new Date(latest.timestamp) : new Date();
+    const expiresAt = new Date(startedAt.getTime() + getPlanDurationDays(plan) * 24 * 60 * 60 * 1000);
+    const active = !refunded && expiresAt.getTime() > Date.now();
+
+    return res.json({
+      success: true,
+      found: true,
+      active,
+      refunded,
+      plan,
+      expiresAt: expiresAt.toISOString(),
+    });
+  } catch (error) {
+    console.error('subscription-status error', error);
+    return res.status(500).json({ success: false, error: 'server_error' });
+  }
+});
+
 // Restore endpoint for website-APK users who reinstall, clear data, or move devices.
 // Matches by email/phone against successful payment ledger entries and restores if
 // the latest matching purchase is still within its plan period.
@@ -1293,6 +1809,14 @@ app.post('/api/restore-subscription', restoreRateLimiter, async (req, res) => {
 
     if (!latest) {
       return res.status(404).json({ success: false, error: 'No matching purchase found for these details.' });
+    }
+
+    if (String(latest.refundStatus || '').trim().toLowerCase() === 'refunded') {
+      return res.status(403).json({
+        success: false,
+        refunded: true,
+        error: 'This subscription was refunded. Please purchase a new plan to continue.',
+      });
     }
 
     const accessKey = `${email}:${phone}`;
