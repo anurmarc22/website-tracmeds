@@ -347,8 +347,10 @@
       let finalReturnUrl = returnUrl + (returnUrl.includes('?') ? '&' : '?') + 'status=success';
       const customerEmail = params.get('customer_email');
       const customerPhone = params.get('customer_phone');
+      const customerPlan = params.get('customer_plan');
       if (customerEmail) finalReturnUrl += '&email=' + encodeURIComponent(customerEmail);
       if (customerPhone) finalReturnUrl += '&phone=' + encodeURIComponent(customerPhone);
+      if (customerPlan) finalReturnUrl += '&plan=' + encodeURIComponent(customerPlan);
       window.location.href = finalReturnUrl;
     } else if (callbackStatus === 'failed') {
       setStatus('Payment could not be verified. Please contact support if you were charged.', true);
@@ -605,6 +607,7 @@
                 let handlerReturnUrl = returnUrl + (returnUrl.includes('?') ? '&' : '?') + 'status=success';
                 if (customerEmailEl.value) handlerReturnUrl += '&email=' + encodeURIComponent(customerEmailEl.value);
                 if (customerPhoneEl.value) handlerReturnUrl += '&phone=' + encodeURIComponent(customerPhoneEl.value);
+                handlerReturnUrl += '&plan=' + encodeURIComponent(plan);
                 window.location.href = handlerReturnUrl;
               } else {
                 setStatus('Payment verification failed. Please contact support if you were charged.', true);
