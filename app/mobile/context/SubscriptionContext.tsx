@@ -27,7 +27,7 @@ interface SubscriptionRecord {
   plan: string;
   title: string;
   priceString: string;
-  status: 'active' | 'pending' | 'cancelled' | 'expired';
+  status: 'active' | 'pending' | 'cancelled' | 'expired' | 'refunded';
   startedAt: string;
   expiresAt: string;    // ISO date string computed at purchase time
   updatedAt: string;
@@ -275,12 +275,14 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       let statusParam = '';
       let emailParam: string | undefined;
       let phoneParam: string | undefined;
+      let planParam: string | undefined;
       let pathname = '';
       try {
         const parsed = new URL(url);
         statusParam = (parsed.searchParams.get('status') || '').toLowerCase();
         emailParam = parsed.searchParams.get('email') || undefined;
         phoneParam = parsed.searchParams.get('phone') || undefined;
+        planParam = (parsed.searchParams.get('plan') || '').toLowerCase() || undefined;
         pathname = parsed.pathname.toLowerCase();
       } catch {
         // Ignore parse failures and keep fallback checks below.
@@ -305,7 +307,18 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       if (isSuccess) {
         try {
           await AsyncStorage.setItem(STORAGE_KEY, 'true');
-          const planFromUrl = normalized.includes('annual') ? DEFAULT_PACKAGES[0] : DEFAULT_PACKAGES[1];
+          // Trust the explicit `plan` param the checkout page now sends back.
+          // Previously this guessed by checking whether the literal text
+          // "annual" appeared anywhere in the deep-link URL — but the URL
+          // never actually contained the plan, so it always fell through to
+          // monthly, even for annual purchases (giving them a 30-day local
+          // expiry instead of 365). The substring check remains only as a
+          // last-resort fallback for older app builds hitting a not-yet-updated
+          // checkout page.
+          const resolvedPlanId = planParam === 'annual' || planParam === 'monthly'
+            ? planParam
+            : (normalized.includes('annual') ? 'annual' : 'monthly');
+          const planFromUrl = DEFAULT_PACKAGES.find((p) => p.identifier === resolvedPlanId) ?? DEFAULT_PACKAGES[1];
 
           const storedRecord = await AsyncStorage.getItem(SUBSCRIPTION_RECORD_KEY);
           let hadPriorExpiredRecord = false;
@@ -409,6 +422,55 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     return () => clearInterval(intervalId);
   }, [isPro, expiresAt]);
 
+  // Local expiry enforcement (above) only catches the natural end of a plan
+  // period — it can't catch a refund issued mid-subscription, since nothing
+  // else in the app ever talks to the server after purchase/restore. This
+  // closes that gap: check in with the server on app foreground and on a
+  // background timer, and revoke access immediately if the server says this
+  // customer's latest purchase was refunded.
+  useEffect(() => {
+    if (!isPro) return;
+
+    const checkRefundStatus = async () => {
+      try {
+        const storedRecord = await AsyncStorage.getItem(SUBSCRIPTION_RECORD_KEY);
+        if (!storedRecord) return;
+        const rec: SubscriptionRecord = JSON.parse(storedRecord);
+        if (!rec.customerEmail || !rec.customerPhone) return;
+
+        const resp = await fetch('https://website-tracmeds-backend-on-render.onrender.com/api/subscription-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: rec.customerEmail, phone: rec.customerPhone }),
+        });
+        if (!resp.ok) return; // network/server issue — fail open, don't revoke on an incomplete check
+        const data = await resp.json();
+
+        if (data?.refunded) {
+          const updated: SubscriptionRecord = { ...rec, status: 'refunded', updatedAt: new Date().toISOString() };
+          await AsyncStorage.setItem(SUBSCRIPTION_RECORD_KEY, JSON.stringify(updated));
+          await AsyncStorage.setItem(STORAGE_KEY, 'false');
+          await cancelDailyReportReminder();
+          setIsPro(false);
+        }
+      } catch {
+        // Offline or request failed — fail open. The next successful check
+        // (foreground or timer) will catch a genuine refund.
+      }
+    };
+
+    checkRefundStatus();
+    const statusIntervalId = setInterval(checkRefundStatus, 15 * 60 * 1000);
+    const appStateSub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') checkRefundStatus();
+    });
+
+    return () => {
+      clearInterval(statusIntervalId);
+      appStateSub?.remove();
+    };
+  }, [isPro]);
+
   const purchase = useCallback(async (pkg: SubscriptionPackage) => {
     const checkoutUrl = getCheckoutUrl(pkg);
     if (!checkoutUrl) {
@@ -436,10 +498,13 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     }
 
     try {
+      // Include deviceId so the server can enforce the 3-device restore cap
+      // (evaluateDeviceAccessPolicy) — without this the cap was silently skipped.
+      const deviceId = await getOrCreateDeviceId();
       const resp = await fetch('https://website-tracmeds-backend-on-render.onrender.com/api/restore-subscription', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, phone }),
+        body: JSON.stringify({ email, phone, deviceId }),
       });
 
       const data = await resp.json().catch(() => ({}));
