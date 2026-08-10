@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /razorpay-checkout.html
+
+Sitemap: https://www.tracmeds.com/sitemap.xml
