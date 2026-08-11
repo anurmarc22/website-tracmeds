@@ -11,6 +11,12 @@ const { google } = require('googleapis');
 const rateLimit = require('express-rate-limit');
 
 const app = express();
+// Render sits in front of this service behind its own proxy, so Express sees
+// every request's X-Forwarded-For header. Without this, express-rate-limit
+// (used by restoreRateLimiter and statusRateLimiter, which back the 3-reinstall
+// cap and the refund-status polling) can't reliably tell requests apart by
+// real client IP — seen firing as a ValidationError in production logs.
+app.set('trust proxy', 1);
 app.use(cors());
 // The Razorpay webhook route needs the RAW request body (exact bytes) to
 // verify the X-Razorpay-Signature header — parsing to JSON and re-serializing
