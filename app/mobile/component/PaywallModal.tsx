@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Modal, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, ScrollView, TextInput } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, ScrollView, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useColors } from '@/hooks/useColors';
@@ -26,25 +26,41 @@ export default function PaywallModal({ visible, onClose, onUnlocked }: Props) {
   const [restoring, setRestoring] = useState(false);
   const [restoreEmail, setRestoreEmail] = useState('');
   const [restorePhone, setRestorePhone] = useState('');
+  // Collected BEFORE checkout opens (not just from the return trip afterward).
+  // This is what lets the app auto-unlock reliably even if the browser's
+  // redirect back into the app fails — SubscriptionContext keeps checking the
+  // server for this exact email/phone in the background until it's confirmed.
+  const [buyerName, setBuyerName] = useState('');
+  const [buyerEmail, setBuyerEmail] = useState('');
+  const [buyerPhone, setBuyerPhone] = useState('');
 
   const s = makeStyles(colors);
 
   const handlePurchase = async (pkg: SubscriptionPackage) => {
+    const email = buyerEmail.trim();
+    const phone = buyerPhone.trim();
+    if (!email || !phone) {
+      Alert.alert(
+        'Email and phone required',
+        'Enter your email and phone before checkout — this is what lets family sharing unlock automatically once payment goes through, even if you don\u2019t get redirected back to the app.'
+      );
+      return;
+    }
     setPurchasingId(pkg.identifier);
-    const result = await purchase(pkg);
+    const result = await purchase(pkg, { name: buyerName.trim() || undefined, email, phone });
     setPurchasingId(null);
     if (result.success && !result.pending) {
       onUnlocked();
     } else if (result.pending) {
-      Alert.alert('Razorpay checkout opened', 'Complete the payment in your browser and return to the app to unlock family sharing.');
+      Alert.alert('Razorpay checkout opened', 'Complete the payment in your browser. Family sharing will unlock automatically once it\u2019s confirmed \u2014 you don\u2019t need to do anything else.');
     } else if (result.error) {
       Alert.alert('Checkout Failed', result.error);
     }
   };
 
   const handleRestore = async () => {
-    if (!restoreEmail.trim() && !restorePhone.trim()) {
-      Alert.alert('Restore details needed', 'Enter the email or phone used during purchase.');
+    if (!restoreEmail.trim() || !restorePhone.trim()) {
+      Alert.alert('Restore details needed', 'Enter both the email and phone used during purchase.');
       return;
     }
     setRestoring(true);
@@ -56,7 +72,7 @@ export default function PaywallModal({ visible, onClose, onUnlocked }: Props) {
     } else if (result.error) {
       Alert.alert('Restore Failed', result.error);
     } else {
-      Alert.alert('Nothing to Restore', 'No previous purchase was found for this account.');
+      Alert.alert('No active plan found', 'No matching active purchase was found for the email and phone you entered.');
     }
   };
 
@@ -67,7 +83,7 @@ export default function PaywallModal({ visible, onClose, onUnlocked }: Props) {
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={s.overlay}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={s.overlay}>
         <View style={s.sheet}>
           <View style={s.header}>
             <Text style={s.title}>Unlock family sharing</Text>
@@ -76,10 +92,41 @@ export default function PaywallModal({ visible, onClose, onUnlocked }: Props) {
             </TouchableOpacity>
           </View>
 
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+
           <Text style={s.subtitle}>
             Download TracMeds first. After installation, continue to Razorpay checkout
             to unlock the Daily Family Report for automatic end-of-day WhatsApp summaries.
           </Text>
+
+          <View style={s.buyerCard}>
+            <Text style={s.buyerTitle}>Your details</Text>
+            <Text style={s.buyerHint}>Used to confirm your payment and unlock automatically — even if you don't get redirected back here.</Text>
+            <TextInput
+              value={buyerName}
+              onChangeText={setBuyerName}
+              placeholder="Name (optional)"
+              placeholderTextColor={colors.mutedForeground}
+              style={s.restoreInput}
+            />
+            <TextInput
+              value={buyerEmail}
+              onChangeText={setBuyerEmail}
+              placeholder="Email"
+              placeholderTextColor={colors.mutedForeground}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              style={s.restoreInput}
+            />
+            <TextInput
+              value={buyerPhone}
+              onChangeText={setBuyerPhone}
+              placeholder="Phone"
+              placeholderTextColor={colors.mutedForeground}
+              keyboardType="phone-pad"
+              style={s.restoreInput}
+            />
+          </View>
 
           {loadingOfferings ? (
             <ActivityIndicator color={colors.primary} style={{ marginVertical: 24 }} />
@@ -133,7 +180,8 @@ export default function PaywallModal({ visible, onClose, onUnlocked }: Props) {
           )}
 
           <View style={s.restoreCard}>
-            <Text style={s.restoreTitle}>Restore on new phone or after reinstall</Text>
+            <Text style={s.restoreTitle}>Restore access on a new phone or after reinstall</Text>
+            <Text style={s.restoreHint}>If your plan is still active, you can restore it by entering the exact email and phone used for the payment.</Text>
             <TextInput
               value={restoreEmail}
               onChangeText={setRestoreEmail}
@@ -160,8 +208,9 @@ export default function PaywallModal({ visible, onClose, onUnlocked }: Props) {
               <Text style={s.restoreText}>Restore Family Unlock</Text>
             )}
           </TouchableOpacity>
+          </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -169,11 +218,22 @@ export default function PaywallModal({ visible, onClose, onUnlocked }: Props) {
 function makeStyles(colors: ReturnType<typeof useColors>) {
   return StyleSheet.create({
     overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-    sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 36 },
+    sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 36, maxHeight: '92%' },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
     title: { fontSize: 19, fontFamily: 'Inter_700Bold', color: colors.foreground },
     subtitle: { fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.mutedForeground, lineHeight: 20, marginBottom: 20 },
     empty: { fontSize: 14, color: colors.mutedForeground, textAlign: 'center', marginVertical: 24 },
+    buyerCard: {
+      marginBottom: 16,
+      padding: 12,
+      borderRadius: 12,
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+      gap: 8,
+    },
+    buyerTitle: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: colors.foreground },
+    buyerHint: { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.mutedForeground, lineHeight: 16 },
     planCard: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
       backgroundColor: colors.background, borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: colors.border,
@@ -211,6 +271,7 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
       gap: 8,
     },
     restoreTitle: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: colors.foreground },
+    restoreHint: { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.mutedForeground, lineHeight: 16 },
     restoreInput: {
       borderWidth: 1,
       borderColor: colors.border,
