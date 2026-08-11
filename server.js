@@ -1597,6 +1597,8 @@ async function appendSubscriptionEventToSheet(event) {
       ? 'Renewal after prior expiry'
       : event.status === 'expired'
       ? 'Access lapsed (client-side expiry)'
+      : event.status === 'refunded'
+      ? 'Refunded — access revoked'
       : event.status;
 
     await sheets.spreadsheets.values.append({
@@ -1700,8 +1702,68 @@ app.post('/api/webhooks/razorpay', async (req, res) => {
 
   // Acknowledge (2xx) any event we're not subscribed to act on, so Razorpay
   // doesn't keep retrying it.
-  if (event.event !== 'refund.processed') {
+  if (event.event !== 'refund.processed' && event.event !== 'payment.captured') {
     return res.json({ success: true, ignored: true });
+  }
+
+  // Guaranteed backstop for recording the purchase — independent of the
+  // customer's browser/connection surviving a cold-started Render instance.
+  // The normal path (/api/verify-payment or /api/payment-callback, both
+  // triggered from the customer's own device right after checkout) is faster
+  // when it works, but it depends on that request actually reaching a woken
+  // server before the customer's connection gives up. This webhook comes
+  // straight from Razorpay instead, which retries automatically for hours if
+  // it doesn't get a 2xx back — so even if the fast path is lost entirely to
+  // a cold start, this guarantees the Sheet1 row (and invoice email) still
+  // happens. resolveInvoiceForPayment is keyed by Payment ID and already
+  // idempotent, so if the fast path already succeeded, this is a no-op.
+  if (event.event === 'payment.captured') {
+    try {
+      const paymentEntity = event.payload?.payment?.entity;
+      const paymentId = paymentEntity?.id;
+      const orderId = paymentEntity?.order_id;
+      const notes = paymentEntity?.notes || {};
+
+      if (!paymentId) {
+        return res.json({ success: true, ignored: true, reason: 'missing_payment_id' });
+      }
+
+      const { invoice, isNew } = await resolveInvoiceForPayment({
+        paymentId,
+        buildParams: {
+          name: notes.name,
+          phone: notes.phone,
+          email: notes.email,
+          address: notes.address,
+          placeOfSupply: notes.place_of_supply,
+          gstRequired: notes.gst_required === 'yes',
+          gstin: notes.gstin,
+          amount: paymentEntity.amount || 0,
+          currency: paymentEntity.currency || 'INR',
+          plan: notes.plan,
+          orderId,
+          receipt: notes.receipt,
+        },
+      });
+
+      if (isNew) {
+        const sheetResult = await appendTransactionToSheet(invoice);
+        if (!sheetResult.success) {
+          console.warn('payment.captured webhook: Google Sheets bookkeeping record could not be appended.', sheetResult);
+        }
+        await sendInvoiceEmail(invoice);
+        console.log(`payment.captured webhook: recorded payment ${paymentId} — the fast path (verify-payment/payment-callback) must not have reached the server.`);
+      } else {
+        console.log(`payment.captured webhook: payment ${paymentId} already recorded — fast path already handled it, nothing to do.`);
+      }
+
+      return res.json({ success: true });
+    } catch (error) {
+      console.error('Error processing payment.captured webhook', error);
+      // Non-2xx so Razorpay retries automatically — same reasoning as the
+      // refund handler below.
+      return res.status(500).json({ success: false, error: 'processing_error' });
+    }
   }
 
   try {
@@ -1742,6 +1804,15 @@ app.post('/api/webhooks/razorpay', async (req, res) => {
     const clearResult = await softClearDevicesForAccessKey(accessKey);
     if (!clearResult.success) {
       console.warn('Unable to soft-clear devices for refunded customer', clearResult);
+    }
+
+    const eventResult = await appendSubscriptionEventToSheet({
+      user: ledgerRow.customerName,
+      plan: ledgerRow.plan,
+      status: 'refunded',
+    });
+    if (!eventResult.success) {
+      console.warn('Unable to log refund event to Sheet1_subscriptions', eventResult);
     }
 
     await sendRefundEmail({
