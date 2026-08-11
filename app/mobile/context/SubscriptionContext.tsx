@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { Linking, AppState } from 'react-native';
 import * as ExpoLinking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -302,6 +302,13 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const [loadingOfferings] = useState(false);
   const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
   const [verificationFailed, setVerificationFailed] = useState(false);
+  // Shared between handleDeepLink and reconcilePendingPurchase — both can
+  // independently confirm the same purchase around the same moment (e.g. the
+  // deep-link fires right as the polling reconciler's own initial check is
+  // still in flight on app launch). Only one confirm-and-report sequence may
+  // run at a time, and each checks the record is still 'pending' once it
+  // acquires the lock, so whichever loses the race sees it's already handled.
+  const isConfirmingPurchaseRef = useRef(false);
 
   // On mount: load persisted subscription state and enforce expiry.
   useEffect(() => {
@@ -392,6 +399,17 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         // hit a sleeping/slow server (the callback never completing, or the
         // Sheets write lagging a few seconds behind) still gets unlocked once
         // the retries catch up, instead of being silently left locked out.
+        //
+        // Shares isConfirmingPurchaseRef with reconcilePendingPurchase: both
+        // can independently confirm the same purchase around the same app-
+        // launch moment, so only one may run at a time. If this loses the
+        // race, that's fine — the guaranteed polling path will still resolve
+        // it; skipping here just avoids a duplicate report to the server.
+        if (isConfirmingPurchaseRef.current) {
+          console.log('[handleDeepLink] a confirm is already in flight — skipping, the guaranteed path will still resolve it.');
+          return;
+        }
+        isConfirmingPurchaseRef.current = true;
         try {
           // Trust the explicit `plan` param the checkout page sends back;
           // fall back to a substring check only for older app builds hitting
@@ -405,15 +423,25 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
           let hadPriorExpiredRecord = false;
           let priorEmail: string | undefined;
           let priorPhone: string | undefined;
+          let priorStatus: SubscriptionRecord['status'] | undefined;
           if (storedRecord) {
             try {
               const prior: SubscriptionRecord = JSON.parse(storedRecord);
+              priorStatus = prior.status;
               hadPriorExpiredRecord = prior.status === 'expired';
               priorEmail = prior.customerEmail;
               priorPhone = prior.customerPhone;
             } catch {
               // corrupted — treat as new
             }
+          }
+
+          // If reconcilePendingPurchase already won the race and resolved
+          // this (record is no longer 'pending'), there's nothing left to do
+          // — re-verifying and re-reporting here would just duplicate it.
+          if (priorStatus && priorStatus !== 'pending') {
+            setIsVerifyingPayment(false);
+            return;
           }
 
           // Keep the record in "pending" state (already set by purchase())
@@ -464,6 +492,8 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         } catch {
           setIsVerifyingPayment(false);
           setVerificationFailed(true);
+        } finally {
+          isConfirmingPurchaseRef.current = false;
         }
       } else if (isCancel) {
         try {
@@ -522,6 +552,10 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     let cancelled = false;
 
     const reconcilePendingPurchase = async () => {
+      // Shared with handleDeepLink — see isConfirmingPurchaseRef declaration
+      // above for why this can't just be a local flag.
+      if (isConfirmingPurchaseRef.current) return;
+      isConfirmingPurchaseRef.current = true;
       try {
         const storedRecord = await AsyncStorage.getItem(SUBSCRIPTION_RECORD_KEY);
         if (!storedRecord) return;
@@ -574,6 +608,8 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         // some other server-side state), leave it as pending — nothing to do.
       } catch {
         // Offline or request failed — the next tick/foreground will retry.
+      } finally {
+        isConfirmingPurchaseRef.current = false;
       }
     };
 
