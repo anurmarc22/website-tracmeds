@@ -11,6 +11,15 @@ const DEVICE_ID_KEY = '@tracmeds:deviceId';
 // Use the backend-hosted checkout route so the details form, Razorpay callback,
 // invoice email, and Google Sheets bookkeeping stay on the same controlled path.
 const CHECKOUT_BASE_URL = 'https://checkout.tracmeds.com/checkout';
+// Single source of truth for the backend base URL — was previously repeated
+// as a literal string at every fetch() call site.
+const SERVER_BASE = 'https://website-tracmeds-backend-on-render.onrender.com';
+
+// How long to keep retrying the post-payment verification check before giving
+// up and asking the user to retry manually. Render's free-tier instance can
+// take 50+ seconds to wake from sleep, so this deliberately spans a couple of
+// minutes with growing gaps between attempts, rather than a few quick tries.
+const VERIFY_RETRY_DELAYS_MS = [0, 3000, 6000, 10000, 15000, 20000, 25000, 30000, 30000];
 
 // Expiry durations — client-side enforcement only.
 // NOTE: This is a one-time-charge setup (not recurring billing), so expiry is
@@ -99,8 +108,14 @@ interface SubscriptionContextValue {
   expiresAt: string | null;
   /** Days remaining in the current subscription period. Negative means expired, null means no subscription. */
   daysRemaining: number | null;
-  purchase: (pkg: SubscriptionPackage) => Promise<{ success: boolean; pending?: boolean; error?: string }>;
+  purchase: (pkg: SubscriptionPackage, identity?: { email?: string; phone?: string; name?: string }) => Promise<{ success: boolean; pending?: boolean; error?: string }>;
   restore: (identity: { email?: string; phone?: string }) => Promise<{ success: boolean; error?: string }>;
+  /** True while the app is actively confirming a just-completed payment with the server. Show a "Confirming your payment…" state while this is true — do not treat app-reopen alone as success. */
+  isVerifyingPayment: boolean;
+  /** Set when a payment's deep-link fired but the server could not confirm it after retrying (e.g. backend was down, not just slow). Prompt the user to use "Restore purchase" with the email/phone they paid with. */
+  verificationFailed: boolean;
+  /** Manually re-run the same server verification used after a payment deep-link. Same underlying check as `restore`, exposed under a clearer name for a "We couldn't confirm your payment — retry" UI. */
+  retryVerification: (identity: { email?: string; phone?: string }) => Promise<{ success: boolean; error?: string }>;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextValue | undefined>(undefined);
@@ -127,7 +142,7 @@ function isExpired(expiresAt: string | null): boolean {
   return new Date(expiresAt).getTime() < Date.now();
 }
 
-function getCheckoutUrl(pkg: SubscriptionPackage) {
+function getCheckoutUrl(pkg: SubscriptionPackage, identity?: { email?: string; phone?: string; name?: string }) {
   const plan = pkg.identifier.toLowerCase();
   const returnBaseUrl = ExpoLinking.createURL('payment/complete');
   const cancelBaseUrl = ExpoLinking.createURL('payment/cancel');
@@ -135,7 +150,15 @@ function getCheckoutUrl(pkg: SubscriptionPackage) {
   const cancelUrl = cancelBaseUrl;
   const cacheBuster = Date.now();
   const resolvedPlan = plan.includes('annual') ? 'annual' : 'monthly';
-  return `${CHECKOUT_BASE_URL}?plan=${resolvedPlan}&return_url=${encodeURIComponent(returnUrl)}&cancel_url=${encodeURIComponent(cancelUrl)}&v=${cacheBuster}`;
+  let url = `${CHECKOUT_BASE_URL}?plan=${resolvedPlan}&return_url=${encodeURIComponent(returnUrl)}&cancel_url=${encodeURIComponent(cancelUrl)}&v=${cacheBuster}`;
+  // Prefills the web checkout form so a returning customer doesn't have to
+  // retype their details — and, just as importantly, means the app already
+  // has this identity saved locally BEFORE the browser ever opens, instead
+  // of only learning it from the fragile deep-link return trip.
+  if (identity?.name) url += `&customer_name=${encodeURIComponent(identity.name)}`;
+  if (identity?.email) url += `&customer_email=${encodeURIComponent(identity.email)}`;
+  if (identity?.phone) url += `&customer_phone=${encodeURIComponent(identity.phone)}`;
+  return url;
 }
 
 async function saveSubscriptionRecord(
@@ -190,7 +213,7 @@ function reportSubscriptionEventToServer(
     // are present on the request body.
     getOrCreateDeviceId().then((deviceId) => {
       console.log('[reportSubscriptionEventToServer] got deviceId, sending fetch', deviceId);
-      fetch('https://website-tracmeds-backend-on-render.onrender.com/api/subscription-event', {
+      fetch(`${SERVER_BASE}/api/subscription-event`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -218,12 +241,67 @@ function reportSubscriptionEventToServer(
   }
 }
 
+// The ONLY thing allowed to unlock Family Sharing. A deep link claiming
+// "success" is treated purely as a signal to go ask the server — never as
+// proof by itself. This calls the read-only /api/subscription-status route
+// (same one the refund-check effect below already uses), which only ever
+// returns active:true for a row that exists because a Razorpay signature was
+// already verified server-side in /api/payment-callback or /api/verify-payment.
+//
+// Retries with backoff because the backend can be asleep (Render free tier)
+// right when the customer's payment completes — a single failed attempt must
+// not be read as "payment didn't happen".
+async function verifySubscriptionActive(
+  email?: string,
+  phone?: string,
+): Promise<{ confirmed: boolean; active?: boolean; refunded?: boolean; plan?: string; expiresAt?: string }> {
+  if (!email || !phone) {
+    return { confirmed: false };
+  }
+
+  for (let i = 0; i < VERIFY_RETRY_DELAYS_MS.length; i++) {
+    const delay = VERIFY_RETRY_DELAYS_MS[i];
+    if (delay > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+    try {
+      const resp = await fetch(`${SERVER_BASE}/api/subscription-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, phone }),
+      });
+      if (!resp.ok) continue; // likely still waking up — try the next delay
+      const data = await resp.json().catch(() => null);
+      if (!data || data.success !== true) continue;
+      if (!data.found) {
+        // Server is awake and reachable, but has no record of this payment
+        // yet — the Sheets write may still be a few seconds behind the
+        // redirect. Keep retrying rather than treating this as a final "no".
+        continue;
+      }
+      return {
+        confirmed: true,
+        active: Boolean(data.active),
+        refunded: Boolean(data.refunded),
+        plan: data.plan,
+        expiresAt: data.expiresAt,
+      };
+    } catch {
+      // Network error / server still asleep — fall through to the next retry.
+    }
+  }
+
+  return { confirmed: false };
+}
+
 export function SubscriptionProvider({ children }: { children: React.ReactNode }) {
   const [isReady, setIsReady] = useState(false);
   const [isPro, setIsPro] = useState(false);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [packages] = useState<SubscriptionPackage[]>(DEFAULT_PACKAGES as unknown as SubscriptionPackage[]);
   const [loadingOfferings] = useState(false);
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
+  const [verificationFailed, setVerificationFailed] = useState(false);
 
   // On mount: load persisted subscription state and enforce expiry.
   useEffect(() => {
@@ -305,16 +383,19 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         normalized.includes('status=failed');
 
       if (isSuccess) {
+        // IMPORTANT: the deep link itself is only a signal to go verify —
+        // it is never treated as proof of payment on its own. Family Sharing
+        // unlocks only if the server confirms an active, signature-verified
+        // record for this email/phone. This closes two risks at once: a real
+        // customer whose deep link fires but whose payment somehow didn't
+        // verify won't get a false unlock, and a real customer who paid but
+        // hit a sleeping/slow server (the callback never completing, or the
+        // Sheets write lagging a few seconds behind) still gets unlocked once
+        // the retries catch up, instead of being silently left locked out.
         try {
-          await AsyncStorage.setItem(STORAGE_KEY, 'true');
-          // Trust the explicit `plan` param the checkout page now sends back.
-          // Previously this guessed by checking whether the literal text
-          // "annual" appeared anywhere in the deep-link URL — but the URL
-          // never actually contained the plan, so it always fell through to
-          // monthly, even for annual purchases (giving them a 30-day local
-          // expiry instead of 365). The substring check remains only as a
-          // last-resort fallback for older app builds hitting a not-yet-updated
-          // checkout page.
+          // Trust the explicit `plan` param the checkout page sends back;
+          // fall back to a substring check only for older app builds hitting
+          // a not-yet-updated checkout page.
           const resolvedPlanId = planParam === 'annual' || planParam === 'monthly'
             ? planParam
             : (normalized.includes('annual') ? 'annual' : 'monthly');
@@ -322,30 +403,67 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
 
           const storedRecord = await AsyncStorage.getItem(SUBSCRIPTION_RECORD_KEY);
           let hadPriorExpiredRecord = false;
+          let priorEmail: string | undefined;
+          let priorPhone: string | undefined;
           if (storedRecord) {
             try {
               const prior: SubscriptionRecord = JSON.parse(storedRecord);
               hadPriorExpiredRecord = prior.status === 'expired';
+              priorEmail = prior.customerEmail;
+              priorPhone = prior.customerPhone;
             } catch {
               // corrupted — treat as new
             }
           }
 
-          const record = await saveSubscriptionRecord(planFromUrl as SubscriptionPackage, 'active', {
-            email: emailParam,
-            phone: phoneParam,
-          });
-          setExpiresAt(record.expiresAt);
-          setIsPro(true);
+          // Keep the record in "pending" state (already set by purchase())
+          // and show a "confirming payment" state in the UI while we verify —
+          // do NOT flip isPro to true yet.
+          setIsVerifyingPayment(true);
+          setVerificationFailed(false);
 
-          console.log('[handleDeepLink] about to call reportSubscriptionEventToServer', { emailParam, phoneParam });
-          reportSubscriptionEventToServer(
-            record,
-            hadPriorExpiredRecord ? 'renewed' : 'active',
-            hadPriorExpiredRecord,
-          );
+          const verifyEmail = emailParam || priorEmail;
+          const verifyPhone = phoneParam || priorPhone;
+          const result = await verifySubscriptionActive(verifyEmail, verifyPhone);
+
+          if (result.confirmed && result.active && !result.refunded) {
+            const resolvedPlan = result.plan === 'annual' || result.plan === 'monthly' ? result.plan : resolvedPlanId;
+            const planToSave = DEFAULT_PACKAGES.find((p) => p.identifier === resolvedPlan) ?? planFromUrl;
+            const record = await saveSubscriptionRecord(planToSave as SubscriptionPackage, 'active', {
+              email: verifyEmail,
+              phone: verifyPhone,
+            });
+            // Prefer the server's own expiry over the client-computed one, since
+            // the server is the source of truth for when the plan started.
+            const finalRecord: SubscriptionRecord = result.expiresAt
+              ? { ...record, expiresAt: result.expiresAt }
+              : record;
+            if (result.expiresAt) {
+              await AsyncStorage.setItem(SUBSCRIPTION_RECORD_KEY, JSON.stringify(finalRecord));
+            }
+            await AsyncStorage.setItem(STORAGE_KEY, 'true');
+            setExpiresAt(finalRecord.expiresAt);
+            setIsPro(true);
+            setIsVerifyingPayment(false);
+
+            console.log('[handleDeepLink] verified, about to call reportSubscriptionEventToServer', { verifyEmail, verifyPhone });
+            reportSubscriptionEventToServer(
+              finalRecord,
+              hadPriorExpiredRecord ? 'renewed' : 'active',
+              hadPriorExpiredRecord,
+            );
+          } else {
+            // Either the server explicitly said this isn't active/is refunded,
+            // or every retry failed to reach it. Either way: stay locked. The
+            // pending record stays on disk so "Restore purchase" (same
+            // underlying check) can recover it once the server is reachable.
+            setIsVerifyingPayment(false);
+            setVerificationFailed(true);
+            console.log('[handleDeepLink] could not confirm payment — leaving Family Sharing locked', { verifyEmail, verifyPhone, result });
+          }
         } catch {
-          // Ignore persistence issues and keep UI state updated.
+          setIsVerifyingPayment(false);
+          setVerificationFailed(true);
         }
       } else if (isCancel) {
         try {
@@ -383,6 +501,90 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       appStateSub?.remove();
     };
   }, []);
+
+  // Automatic unlock that does NOT depend on the deep-link handoff at all.
+  // Requirement: once Razorpay has received the money, the customer's app
+  // must unlock Family Sharing on its own — regardless of whether the
+  // checkout browser's redirect back into the app ever fires. The deep link
+  // is just one *fast path* to that; this is the guaranteed path.
+  //
+  // How: `purchase()` now saves customerEmail/customerPhone into the local
+  // "pending" record BEFORE the browser even opens (see getCheckoutUrl /
+  // purchase above), not only after a successful return trip. So as long as
+  // a pending purchase is sitting on this device, the app can independently
+  // ask the server "did this ever get paid?" on its own — every time it's
+  // opened, and on a background timer while it's open — with zero action
+  // from the customer. The very next time they open the app after paying,
+  // even if the deep link failed outright, this confirms and unlocks it.
+  useEffect(() => {
+    if (!isReady) return;
+
+    let cancelled = false;
+
+    const reconcilePendingPurchase = async () => {
+      try {
+        const storedRecord = await AsyncStorage.getItem(SUBSCRIPTION_RECORD_KEY);
+        if (!storedRecord) return;
+        const rec: SubscriptionRecord = JSON.parse(storedRecord);
+        if (rec.status !== 'pending') return; // already resolved (active/expired/refunded) — nothing to reconcile
+        if (!rec.customerEmail || !rec.customerPhone) return; // nothing to check the server with
+
+        // Give up auto-polling a checkout that was opened and never completed
+        // more than 7 days ago (abandoned cart), so this doesn't poll forever.
+        // The customer can still use "Restore purchase" manually at any time.
+        const ageMs = Date.now() - new Date(rec.startedAt).getTime();
+        if (ageMs > 7 * 24 * 60 * 60 * 1000) return;
+
+        const resp = await fetch(`${SERVER_BASE}/api/subscription-status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: rec.customerEmail, phone: rec.customerPhone }),
+        });
+        if (!resp.ok) return; // server likely still waking up — the next tick/foreground will catch it
+        const data = await resp.json().catch(() => null);
+        if (!data || data.success !== true || !data.found) return;
+        if (cancelled) return;
+
+        if (data.refunded) {
+          const updated: SubscriptionRecord = { ...rec, status: 'refunded', updatedAt: new Date().toISOString() };
+          await AsyncStorage.setItem(SUBSCRIPTION_RECORD_KEY, JSON.stringify(updated));
+          return;
+        }
+        if (data.active) {
+          const updated: SubscriptionRecord = {
+            ...rec,
+            status: 'active',
+            expiresAt: data.expiresAt || rec.expiresAt,
+            updatedAt: new Date().toISOString(),
+          };
+          await AsyncStorage.setItem(SUBSCRIPTION_RECORD_KEY, JSON.stringify(updated));
+          await AsyncStorage.setItem(STORAGE_KEY, 'true');
+          setExpiresAt(updated.expiresAt);
+          setIsPro(true);
+          setIsVerifyingPayment(false);
+          setVerificationFailed(false);
+        }
+        // If found but not active and not refunded (e.g. expired instantly, or
+        // some other server-side state), leave it as pending — nothing to do.
+      } catch {
+        // Offline or request failed — the next tick/foreground will retry.
+      }
+    };
+
+    reconcilePendingPurchase();
+    // Frequent enough to feel instant to the customer on their next open,
+    // without hammering the server while the app just happens to be open.
+    const intervalId = setInterval(reconcilePendingPurchase, 45 * 1000);
+    const appStateSub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') reconcilePendingPurchase();
+    });
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+      appStateSub?.remove();
+    };
+  }, [isReady]);
 
   // While the app is open, continuously enforce expiry so access is revoked
   // as soon as the plan period lapses (without requiring app restart).
@@ -438,7 +640,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         const rec: SubscriptionRecord = JSON.parse(storedRecord);
         if (!rec.customerEmail || !rec.customerPhone) return;
 
-        const resp = await fetch('https://website-tracmeds-backend-on-render.onrender.com/api/subscription-status', {
+        const resp = await fetch(`${SERVER_BASE}/api/subscription-status`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: rec.customerEmail, phone: rec.customerPhone }),
@@ -471,8 +673,8 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     };
   }, [isPro]);
 
-  const purchase = useCallback(async (pkg: SubscriptionPackage) => {
-    const checkoutUrl = getCheckoutUrl(pkg);
+  const purchase = useCallback(async (pkg: SubscriptionPackage, identity?: { email?: string; phone?: string; name?: string }) => {
+    const checkoutUrl = getCheckoutUrl(pkg, identity);
     if (!checkoutUrl) {
       return { success: false, error: 'Razorpay checkout link is not configured yet.' };
     }
@@ -481,8 +683,12 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       if (!supported) {
         return { success: false, error: 'This device cannot open the Razorpay checkout link.' };
       }
-      // Save a pending record now; expiresAt will be finalised when the success deep-link arrives.
-      await saveSubscriptionRecord(pkg, 'pending');
+      // Save a pending record now, WITH identity if we already have it (e.g.
+      // a returning customer, or one who entered it in-app). This is what
+      // lets the background reconciliation check below confirm and unlock
+      // the purchase automatically later even if the deep-link return trip
+      // from checkout never fires — expiresAt is finalised once verified.
+      await saveSubscriptionRecord(pkg, 'pending', identity);
       await Linking.openURL(checkoutUrl);
       return { success: true, pending: true };
     } catch (e: any) {
@@ -501,7 +707,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       // Include deviceId so the server can enforce the 3-device restore cap
       // (evaluateDeviceAccessPolicy) — without this the cap was silently skipped.
       const deviceId = await getOrCreateDeviceId();
-      const resp = await fetch('https://website-tracmeds-backend-on-render.onrender.com/api/restore-subscription', {
+      const resp = await fetch(`${SERVER_BASE}/api/restore-subscription`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, phone, deviceId }),
@@ -541,10 +747,42 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     }
   }, []);
 
+  // Same server check as the deep-link path above, exposed for a "We
+  // couldn't confirm your payment — retry" button so a customer isn't stuck
+  // waiting on a deep link that already failed once. Reuses `restore`, which
+  // does the identical active/refunded check plus device registration —
+  // there's no need for a second, parallel code path. Falls back to the
+  // email/phone already saved locally (from purchase() or an earlier deep
+  // link) when the caller doesn't have them handy — e.g. a generic "Try
+  // again" button on the payment-complete screen shouldn't need to ask the
+  // customer to retype what they already entered once.
+  const retryVerification = useCallback(async (identity: { email?: string; phone?: string }) => {
+    setVerificationFailed(false);
+    let email = identity?.email;
+    let phone = identity?.phone;
+    if (!email || !phone) {
+      try {
+        const storedRecord = await AsyncStorage.getItem(SUBSCRIPTION_RECORD_KEY);
+        if (storedRecord) {
+          const rec: SubscriptionRecord = JSON.parse(storedRecord);
+          email = email || rec.customerEmail;
+          phone = phone || rec.customerPhone;
+        }
+      } catch {
+        // fall through — restore() will report the missing-identity error
+      }
+    }
+    const result = await restore({ email, phone });
+    if (!result.success) {
+      setVerificationFailed(true);
+    }
+    return result;
+  }, [restore]);
+
   const daysRemaining = computeDaysRemaining(expiresAt);
 
   return (
-    <SubscriptionContext.Provider value={{ isReady, isPro, packages, loadingOfferings, expiresAt, daysRemaining, purchase, restore }}>
+    <SubscriptionContext.Provider value={{ isReady, isPro, packages, loadingOfferings, expiresAt, daysRemaining, purchase, restore, isVerifyingPayment, verificationFailed, retryVerification }}>
       {children}
     </SubscriptionContext.Provider>
   );
