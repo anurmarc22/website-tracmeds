@@ -563,6 +563,12 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
           setIsPro(true);
           setIsVerifyingPayment(false);
           setVerificationFailed(false);
+          // This is the guaranteed unlock path (doesn't depend on the deep-link
+          // handoff), so it needs the same reporting call the deep-link handler
+          // makes — otherwise Sheet1_subscriptions and the Devices sheet never
+          // get this purchase whenever the customer unlocks via polling instead
+          // of the redirect back into the app.
+          reportSubscriptionEventToServer(updated, 'active', false);
         }
         // If found but not active and not refunded (e.g. expired instantly, or
         // some other server-side state), leave it as pending — nothing to do.
