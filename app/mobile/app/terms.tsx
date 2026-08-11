@@ -1,14 +1,13 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useApp } from '@/context/AppContext';
 
-const EFFECTIVE_DATE = 'August 3, 2026';
+const EFFECTIVE_DATE = 'August 11, 2026';
 const APP_NAME = 'Tracmeds';
 const OWNER = 'the Tracmeds owner and developer';
 
@@ -36,7 +35,7 @@ export default function TermsScreen() {
     <View style={[s.container, { paddingTop: topPad }]}>
       <LinearGradient colors={[colors.primary, '#2563EB']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.hero}>
         <View style={s.iconWrap}>
-          <MaterialCommunityIcons name="pill" size={40} color="#fff" />
+          <Image source={require('../assets/images/icon.png')} style={s.heroIcon} resizeMode="contain" />
         </View>
         <Text style={s.appName}>{APP_NAME}</Text>
         <Text style={s.tagline}>Terms of Use & Privacy Policy</Text>
@@ -128,11 +127,11 @@ export default function TermsScreen() {
           {APP_NAME} is designed with your privacy as the highest priority:
         </Text>
         <Text style={s.body}>
-          Where premium family-sharing features are purchased, the app may keep a local record of the selected plan, status, and purchase timestamp to support access review, support requests, renewals, and refund handling. This record is kept locally on your device and is not used for unrelated tracking.
+          Where premium family-sharing features are purchased, the app may keep a local record of the selected plan, status, and purchase timestamp on your device to support access review and renewals. Separately, at checkout we collect your name, phone number, and email for every purchase — required to process payment, generate your invoice, verify your access, and enable "Restore Purchase" on a new or reinstalled device. If you request a GST invoice, we additionally collect your GSTIN. We also record your device identifier against your purchase to enforce the reinstall limit described in Section 6.1. This billing information is stored with the payment record on Razorpay and/or in a secure internal record — it is not sold or shared with third parties for marketing purposes.
         </Text>
         {[
-          'All health data — medicines, appointments, health readings, contact lists — is stored exclusively on your device using local storage (AsyncStorage). No data is transmitted to any server, database, or third-party service.',
-          `${APP_NAME} does not collect, store, process, or have access to any of your personal or health information.`,
+          'All health data — medicines, appointments, health readings, contact lists — is stored exclusively on your device using local storage (AsyncStorage). No health data is transmitted to any server, database, or third-party service.',
+          `${APP_NAME} does not collect, store, process, or have access to your health information — that stays exclusively on your device. Billing information described above is handled separately, as part of processing your payment.`,
           'No analytics, crash reporting, advertising identifiers, or tracking technologies are embedded in the application.',
           'WhatsApp sharing is entirely user-initiated. Tapping a share button opens WhatsApp on your device with a pre-filled message. The message is sent by you via your own WhatsApp account. The app owner has no visibility into, control over, or responsibility for any WhatsApp messages you send.',
           'Contact information you store in the app (for WhatsApp sharing) remains solely on your device and is never uploaded or shared with the app developer.',
@@ -142,6 +141,11 @@ export default function TermsScreen() {
             <Text style={s.bulletText}>{item}</Text>
           </View>
         ))}
+
+        <Text style={s.sectionNum}>6.1 Device Changes and Reinstallation</Text>
+        <Text style={s.body}>
+          If you reinstall the app or switch to a new phone during an active subscription period, your subscription can be restored on the new device at no extra cost — provided you use the same registered email and phone number. This restoration is limited to 3 devices per subscription. Once you have used all 3 restorations, any further device change or reinstallation — even within your current subscription period — will require purchasing a new plan. We recommend exporting your readings/data before reinstalling or switching devices, as a precaution.
+        </Text>
 
         {/* ── 7. WHATSAPP ── */}
         <Text style={s.sectionNum}>7. WhatsApp Sharing Features</Text>
@@ -240,7 +244,7 @@ export default function TermsScreen() {
           <Text style={s.acceptBtnText}>{hasReachedEnd ? 'I Agree & Get Started' : 'Scroll to the end to continue'}</Text>
         </TouchableOpacity>
 
-        <Text style={s.footer}>Effective Date: {EFFECTIVE_DATE} · Version 1.0</Text>
+        <Text style={s.footer}>Effective Date: {EFFECTIVE_DATE} · Version 1.1</Text>
       </ScrollView>
     </View>
   );
@@ -250,7 +254,8 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
     hero: { paddingVertical: 32, alignItems: 'center', gap: 6 },
-    iconWrap: { width: 68, height: 68, borderRadius: 34, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+    iconWrap: { width: 90, height: 90, borderRadius: 45, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center', marginBottom: 4, overflow: 'hidden' },
+    heroIcon: { width: 70, height: 70, borderRadius: 20 },
     appName: { fontSize: 30, fontFamily: 'Inter_700Bold', color: '#fff' },
     tagline: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: 'rgba(255,255,255,0.9)' },
     effectiveDate: { fontSize: 12, fontFamily: 'Inter_400Regular', color: 'rgba(255,255,255,0.7)' },
