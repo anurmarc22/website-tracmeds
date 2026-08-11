@@ -45,6 +45,10 @@ interface SubscriptionRecord {
   // (renewed/expired) can still identify the customer for device tracking.
   customerEmail?: string;
   customerPhone?: string;
+  // Typed into the paywall form at purchase time. Only used for the "User"
+  // column in Sheet1_subscriptions bookkeeping — never for matching/lookup,
+  // which always uses email+phone.
+  customerName?: string;
 }
 
 // Generates a lightweight per-install identifier (not cryptographically
@@ -164,18 +168,18 @@ function getCheckoutUrl(pkg: SubscriptionPackage, identity?: { email?: string; p
 async function saveSubscriptionRecord(
   pkg: SubscriptionPackage,
   status: SubscriptionRecord['status'],
-  identity?: { email?: string; phone?: string },
+  identity?: { email?: string; phone?: string; name?: string },
 ): Promise<SubscriptionRecord> {
   const now = new Date();
   const expiresAt = computeExpiresAt(pkg.identifier, now);
-  // Preserve any previously-known email/phone (e.g. from the original purchase)
+  // Preserve any previously-known identity (e.g. from the original purchase)
   // when a later event, like expiry, doesn't carry fresh identity of its own.
-  let previousIdentity: { customerEmail?: string; customerPhone?: string } = {};
+  let previousIdentity: { customerEmail?: string; customerPhone?: string; customerName?: string } = {};
   try {
     const stored = await AsyncStorage.getItem(SUBSCRIPTION_RECORD_KEY);
     if (stored) {
       const prior: SubscriptionRecord = JSON.parse(stored);
-      previousIdentity = { customerEmail: prior.customerEmail, customerPhone: prior.customerPhone };
+      previousIdentity = { customerEmail: prior.customerEmail, customerPhone: prior.customerPhone, customerName: prior.customerName };
     }
   } catch { /* ignore — fall back to whatever identity was passed in */ }
 
@@ -190,6 +194,7 @@ async function saveSubscriptionRecord(
     supportNote: 'Family sharing access is managed through the app and can be reviewed for support or refund requests.',
     customerEmail: identity?.email || previousIdentity.customerEmail,
     customerPhone: identity?.phone || previousIdentity.customerPhone,
+    customerName: identity?.name || previousIdentity.customerName,
   };
   await AsyncStorage.setItem(SUBSCRIPTION_RECORD_KEY, JSON.stringify(record));
   return record;
@@ -334,7 +339,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
             AsyncStorage.setItem(SUBSCRIPTION_RECORD_KEY, JSON.stringify(updated)),
           ]);
           await cancelDailyReportReminder();
-          reportSubscriptionEventToServer(updated, 'expired', false);
+          reportSubscriptionEventToServer(updated, 'expired', false, updated.customerName);
           setIsPro(false);
           setExpiresAt(record.expiresAt);   // keep visible so UI can show "expired on…"
         } else {
@@ -479,6 +484,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
               finalRecord,
               hadPriorExpiredRecord ? 'renewed' : 'active',
               hadPriorExpiredRecord,
+              finalRecord.customerName,
             );
           } else {
             // Either the server explicitly said this isn't active/is refunded,
@@ -602,7 +608,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
           // makes — otherwise Sheet1_subscriptions and the Devices sheet never
           // get this purchase whenever the customer unlocks via polling instead
           // of the redirect back into the app.
-          reportSubscriptionEventToServer(updated, 'active', false);
+          reportSubscriptionEventToServer(updated, 'active', false, updated.customerName);
         }
         // If found but not active and not refunded (e.g. expired instantly, or
         // some other server-side state), leave it as pending — nothing to do.
@@ -646,7 +652,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
               updatedAt: new Date().toISOString(),
             };
             await AsyncStorage.setItem(SUBSCRIPTION_RECORD_KEY, JSON.stringify(updated));
-            reportSubscriptionEventToServer(updated, 'expired', false);
+            reportSubscriptionEventToServer(updated, 'expired', false, updated.customerName);
           } catch {
             // corrupted record — continue with revocation
           }
