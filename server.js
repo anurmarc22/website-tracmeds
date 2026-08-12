@@ -1742,7 +1742,12 @@ app.post('/api/webhooks/razorpay', async (req, res) => {
           currency: paymentEntity.currency || 'INR',
           plan: notes.plan,
           orderId,
-          receipt: notes.receipt,
+          // Unlike the client-driven paths, Razorpay's payment.notes never
+          // carries `receipt` — that's a separate top-level field on the
+          // order, not something copied onto the payment. Synthesize one
+          // rather than leaving it blank; this is purely a reference string,
+          // never used for matching/lookup (that's always by Payment ID).
+          receipt: notes.receipt || `tracmeds_${notes.plan || 'monthly'}_webhook_${paymentId}`,
         },
       });
 
