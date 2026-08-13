@@ -14,6 +14,7 @@ import { useApp } from '@/context/AppContext';
 import { useSubscription } from '@/context/SubscriptionContext';
 import TimeInput12h from '@/components/TimeInput12h';
 import ExportModal from '@/components/ExportModal';
+import PaywallModal from '@/components/PaywallModal';
 import DataWarningModal from '@/components/DataWarningModal';
 import { formatTime12 } from '@/utils/time';
 import { UserProfile, NotificationContact, ContactRelation } from '@/types';
@@ -176,6 +177,7 @@ export default function ProfileScreen() {
   const [showExport, setShowExport] = useState(false);
   const [showDataWarning, setShowDataWarning] = useState(false);
   const [dataWarningReady, setDataWarningReady] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
 
   React.useEffect(() => {
     let mounted = true;
@@ -327,6 +329,7 @@ export default function ProfileScreen() {
                     : 'Unlock the Daily Family Report after purchase.'}
               </Text>
             </View>
+            {!isPro && <Ionicons name="lock-closed" size={18} color={colors.mutedForeground} />}
           </View>
 
           <Text style={[s.settingLabel, { marginBottom: 8 }]}>Reminder time</Text>
@@ -362,9 +365,12 @@ export default function ProfileScreen() {
           )}
 
           <TouchableOpacity
-            style={[s.sendNowBtn, !isPro && { opacity: 0.5 }]}
-            disabled={!isPro}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); sendDailyReport(); }}
+            style={s.sendNowBtn}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              if (!isPro) { setShowPaywall(true); return; }
+              sendDailyReport();
+            }}
           >
             <Ionicons name="logo-whatsapp" size={18} color="#fff" />
             <Text style={s.sendNowBtnText}>Send Today's Report Now</Text>
@@ -387,9 +393,8 @@ export default function ProfileScreen() {
           </View>
 
           <TouchableOpacity
-            style={[s.saveBtn, !isPro && { opacity: 0.45 }]}
-            disabled={!isPro}
-            onPress={() => setShowExport(true)}
+            style={s.saveBtn}
+            onPress={() => { if (!isPro) { setShowPaywall(true); return; } setShowExport(true); }}
           >
             <Ionicons name="download-outline" size={18} color="#fff" />
             <Text style={[s.saveBtnText, { marginLeft: 8 }]}>Export / Share Records</Text>
@@ -430,6 +435,7 @@ export default function ProfileScreen() {
       <AddContactModal visible={showAddContact} colors={colors} onClose={() => setShowAddContact(false)} onSave={addContact} />
       <DataWarningModal visible={showDataWarning && dataWarningReady} onClose={handleDismissDataWarning} onOpenExport={handleOpenExport} />
       <ExportModal visible={showExport} onClose={() => setShowExport(false)} />
+      <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} onUnlocked={() => setShowPaywall(false)} />
     </View>
   );
 }
