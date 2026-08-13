@@ -569,16 +569,17 @@
         <div class="legal-doc">
           <div class="doc-head">
             <h3>Privacy Policy</h3>
-            <span class="updated">Effective: 11 August 2026 · Version 1.1</span>
+            <span class="updated">Effective: 13 August 2026 · Version 1.3</span>
           </div>
-          <p style="color:var(--muted); font-size:.95rem; line-height:1.75; padding-bottom:8px;">This policy explains how TracMeds ("the App") handles information when you track medicines, appointments, and health readings, and when you choose to share them. It applies to the Android and iOS apps and to www.tracmeds.com, including purchase and subscription access through Razorpay.</p>
+          <p style="color:var(--muted); font-size:.95rem; line-height:1.75; padding-bottom:8px;">This policy explains how TracMeds ("the App") handles information when you track medicines, appointments, and health readings, and when you choose to share them. It applies to the Android and iOS apps, including the Apple Watch companion app, and to www.tracmeds.com. Subscription and purchase handling differs by platform: on iOS, purchases are processed through Apple's In-App Purchase system via RevenueCat; on Android, purchases are processed through Razorpay. Platform-specific details are set out below.</p>
 
           <details class="legal-item" open>
             <summary>Data storage — on your device only<span class="plus">+</span></summary>
             <div class="legal-body">
               <ul>
                 <li>All health data — medicines, appointments, health readings, and any contacts you save for sharing — is stored exclusively on your device using local on-device storage. No health data is transmitted to any server, database, or third party.</li>
-                <li>TracMeds does not collect, store, process, or have access to your <strong>health</strong> information — that stays exclusively on your device, as described above. Billing information (see "Subscriptions" below) is handled separately and is collected as part of processing your payment.</li>
+                <li>On iOS, this includes entries logged directly on the Apple Watch companion app — such as exercise, readings, or reminders logged while away from your iPhone — which are stored locally on the Watch and sync to your iPhone automatically once the two devices reconnect.</li>
+                <li>TracMeds does not collect, store, process, or have access to your <strong>health</strong> information — that stays exclusively on your device (iPhone or Apple Watch), as described above. Billing information (see "Subscriptions" below) is handled separately and is collected as part of processing your payment.</li>
                 <li>For paid access, the app may keep only a minimal local record of the selected plan, purchase status, and purchase timestamp to support access review, support requests, renewals, and refund handling. This is separate from your health or personal data.</li>
                 <li>Contact details you save for sharing purposes remain solely on your device and are never uploaded to us.</li>
               </ul>
@@ -610,8 +611,8 @@
           <details class="legal-item">
             <summary>Subscriptions<span class="plus">+</span></summary>
             <div class="legal-body">
-              <p>If you choose a paid plan, your subscription and payment are handled through Razorpay on www.tracmeds.com. Razorpay processes payments securely; TracMeds does not receive or store your payment card details. Only the minimum purchase metadata needed to verify access, support, and billing review is used.</p>
-              <p>At checkout, we collect your name, phone number, and email for every purchase — this is required to process payment, generate your invoice, verify your access, and enable "Restore Purchase" on a new or reinstalled device. If you request a GST invoice, we additionally collect your GSTIN. We also record your device identifier against your purchase to enforce the reinstall limit described in the Terms of Service. This information is stored with the payment record on Razorpay and/or in a secure internal record.</p>
+              <p><strong>iOS:</strong> If you choose a paid plan on iOS, your purchase is processed entirely through Apple's In-App Purchase system, managed via RevenueCat. TracMeds never receives or stores your payment card details — Apple handles billing directly. RevenueCat receives only a purchase and subscription identifier and entitlement status, used solely to verify and manage your Family Sharing Unlock access. Apple, not TracMeds, issues your purchase receipt and handles GST for App Store transactions in India.</p>
+              <p><strong>Android:</strong> If you choose a paid plan on Android, your subscription and payment are handled through Razorpay on www.tracmeds.com. Razorpay processes payments securely; TracMeds does not receive or store your payment card details. At checkout, we collect your name, phone number, and email for every purchase — this is required to process payment, generate your invoice, verify your access, and enable "Restore Purchase" on a new or reinstalled device. If you request a GST invoice, we additionally collect your GSTIN. We also record your device identifier against your purchase to enforce the reinstall limit described in the Terms of Service. This information is stored with the payment record on Razorpay and/or in a secure internal record.</p>
             </div>
           </details>
 
@@ -662,7 +663,7 @@
         <div class="legal-doc">
           <div class="doc-head">
             <h3>Terms of Service</h3>
-            <span class="updated">Effective: 26 July 2026 · Version 1.0</span>
+            <span class="updated">Effective: 13 August 2026 · Version 1.2</span>
           </div>
 
           <details class="legal-item" open>
@@ -676,7 +677,7 @@
             <summary>Not a medical device, service, or source of advice<span class="plus">+</span></summary>
             <div class="legal-body">
               <p><strong>TracMeds is not a medical device, medical service, or provider of medical advice. It is, solely and only, a personal medicine, appointment, and health-reading tracking and sharing tool.</strong></p>
-              <p>All content, data-entry fields, reminders, and information within the app are intended solely for personal organisational and tracking purposes. Nothing in TracMeds constitutes, replaces, or should be construed as professional medical advice, clinical diagnosis, treatment recommendation, prescription guidance, or emergency medical assistance.</p>
+              <p>This applies equally whether you use TracMeds on iPhone or on the Apple Watch companion app. All content, data-entry fields, reminders, and information within the app — on either device — are intended solely for personal organisational and tracking purposes. Nothing in TracMeds constitutes, replaces, or should be construed as professional medical advice, clinical diagnosis, treatment recommendation, prescription guidance, or emergency medical assistance.</p>
               <p>Always consult a licensed, qualified healthcare professional before making any decision related to your health, medications, dosage, or treatment. In a medical emergency, contact your local emergency services immediately — do not rely on this app.</p>
             </div>
           </details>
@@ -684,8 +685,8 @@
           <details class="legal-item">
             <summary>No liability, under any circumstances<span class="plus">+</span></summary>
             <div class="legal-body">
-              <p>To the maximum extent permitted by applicable law: TracMeds, its owner, its developer, its affiliates, licensors, employees, agents, contractors, and any person or entity associated with the development, distribution, or maintenance of TracMeds shall not be liable for any direct, indirect, incidental, special, consequential, exemplary, punitive, or other damages of any kind, arising out of or in any way connected with the app or its functioning — under any circumstances.</p>
-              <p>This applies regardless of the legal theory — contract, tort (including negligence), strict liability, or otherwise — even where advised of the possibility of such damages, and covers (without limitation): missed medications or dosage errors, incorrect health readings or data entry, missed or delayed medical appointments, reminders that failed to trigger, WhatsApp message delivery failures or unintended disclosures, loss of data due to device failure, uninstalling, or app error, and any other health, financial, or consequential loss.</p>
+              <p>To the maximum extent permitted by applicable law: TracMeds, its owner, its developer, its affiliates, licensors, employees, agents, contractors, and any person or entity associated with the development, distribution, or maintenance of TracMeds — across the iPhone app, the Apple Watch companion app, the Android app, and www.tracmeds.com — shall not be liable for any direct, indirect, incidental, special, consequential, exemplary, punitive, or other damages of any kind, arising out of or in any way connected with the app or its functioning — under any circumstances.</p>
+              <p>This applies regardless of the legal theory — contract, tort (including negligence), strict liability, or otherwise — even where advised of the possibility of such damages, and covers (without limitation): missed medications or dosage errors, incorrect health readings or data entry, missed or delayed medical appointments, reminders that failed to trigger on iPhone or Apple Watch, delays or failures in syncing data between the Apple Watch and iPhone, loss of any entry logged on the Apple Watch that was never synced to the iPhone (including due to the Watch being lost, damaged, reset, or never reconnected), discrepancies between data shown on the Watch and the iPhone due to sync timing, WhatsApp message delivery failures or unintended disclosures, loss of data due to device failure, uninstalling, or app error, and any other health, financial, or consequential loss.</p>
               <p>TracMeds is provided "as is" and "as available," without warranties of any kind, express or implied, including implied warranties of merchantability, fitness for a particular purpose, accuracy, reliability, or non-infringement. The app's owner and developer do not warrant that the app will be uninterrupted, error-free, secure, or free of harmful components.</p>
             </div>
           </details>
@@ -730,15 +731,17 @@
           <details class="legal-item">
             <summary>Subscriptions &amp; payments<span class="plus">+</span></summary>
             <div class="legal-body">
-              <p>Paid features are billed and managed through Razorpay on www.tracmeds.com. Billing, renewal, and cancellation follow Razorpay's policies — manage or cancel subscriptions through Razorpay's customer portal or the payment confirmation emails. TracMeds does not receive or store your payment card details, and basic subscription records may be kept locally in the app to support access review, support requests, and refund handling.</p>
+              <p><strong>iOS:</strong> Paid features on iOS are billed and managed entirely through Apple's In-App Purchase system. Billing, renewal, and cancellation follow Apple's policies — manage or cancel your subscription anytime via Settings → [your name] → Subscriptions on your iPhone. TracMeds does not receive or store your payment card details. RevenueCat manages your entitlement status, and basic subscription records may be kept to support access review and support requests.</p>
+              <p><strong>Android:</strong> Paid features on Android are billed and managed through Razorpay on www.tracmeds.com. Billing, renewal, and cancellation follow Razorpay's policies — manage or cancel subscriptions through Razorpay's customer portal or the payment confirmation emails. TracMeds does not receive or store your payment card details, and basic subscription records may be kept locally in the app to support access review, support requests, and refund handling.</p>
             </div>
           </details>
 
           <details class="legal-item">
             <summary>Device changes &amp; reinstalls<span class="plus">+</span></summary>
             <div class="legal-body">
-              <p>Since all data is stored locally on your device, changing your phone or reinstalling the app permanently deletes your existing medicines, appointments, and health readings. <strong>We strongly recommend exporting your readings before you reinstall the app or switch to a new device.</strong></p>
-              <p>If you have an active subscription, you may restore access on a new or reinstalled device at no extra cost, provided the email and phone number match your original purchase. This is limited to <strong>3 device changes or reinstalls per subscription</strong>. Once you have used all 3, any further device change or reinstall — even if you are still within your current subscription period — will require purchasing a new plan to regain access.</p>
+              <p>Since all data is stored locally on your device, changing your phone or reinstalling the app permanently deletes your existing medicines, appointments, and health readings. This includes any entries logged on the Apple Watch companion app that had not yet synced to your iPhone before the change — <strong>we strongly recommend ensuring your Watch has synced, and exporting your readings, before you reinstall the app or switch to a new device.</strong></p>
+              <p><strong>iOS:</strong> If you have an active subscription, you can restore your Family Sharing Unlock access on any device signed in with the same Apple ID, at no extra cost and with no limit on the number of restores, using the "Restore Purchase" option in the app. This follows Apple's standard purchase-restoration rules.</p>
+              <p><strong>Android:</strong> If you have an active subscription, you may restore access on a new or reinstalled device at no extra cost, provided the email and phone number match your original purchase. This is limited to <strong>3 device changes or reinstalls per subscription</strong>. Once you have used all 3, any further device change or reinstall — even if you are still within your current subscription period — will require purchasing a new plan to regain access.</p>
             </div>
           </details>
 
@@ -794,13 +797,23 @@
           <span class="kicker">Legal · Refunds</span>
           <div class="capsule-rule"></div>
           <h2>Refund Policy</h2>
-          <p>Digital app purchases are final once access is granted, but we review refund requests fairly when there is a genuine issue.</p>
+          <p>Refund handling depends on how you purchased — Apple manages refunds for iOS, and we manage them directly for Android purchases made via Razorpay.</p>
         </div>
         <div class="legal-doc">
           <div class="doc-head">
             <h3>Refund Policy</h3>
-            <span class="updated">Effective: 3 August 2026 · Version 1.1</span>
+            <span class="updated">Effective: 13 August 2026 · Version 1.2</span>
           </div>
+          <p style="color:var(--muted); font-size:.95rem; line-height:1.75; padding-bottom:8px;">Refund handling differs by platform, since Apple and Razorpay each control their own payment and refund process.</p>
+
+          <p style="color:var(--ink); font-weight:700; font-size:1rem; margin:18px 0 8px;">For iOS purchases (Apple In-App Purchase)</p>
+          <ul style="margin:0 0 12px; padding-left:20px; color:var(--muted); font-size:.95rem; line-height:1.75;">
+            <li>All iOS purchases are processed by Apple. Apple has sole authority over approving or denying refunds — TracMeds does not process, approve, or deny refunds for iOS purchases directly.</li>
+            <li>To request a refund for an iOS purchase, submit your request directly to Apple at <a href="https://reportaproblem.apple.com" target="_blank" rel="noreferrer" style="color:var(--violet-dark); font-weight:600;">reportaproblem.apple.com</a>, or via Settings → [your name] → Subscriptions on your iPhone.</li>
+            <li>Apple's own refund policies, review process, and timelines apply to all iOS purchases.</li>
+          </ul>
+
+          <p style="color:var(--ink); font-weight:700; font-size:1rem; margin:18px 0 8px;">For Android purchases (Razorpay)</p>
           <p style="color:var(--muted); font-size:.95rem; line-height:1.75; padding-bottom:8px;">Refunds are considered only for payments made in error, duplicate charges, or where the app is not usable due to a confirmed technical issue on our side.</p>
           <ul style="margin:0 0 12px; padding-left:20px; color:var(--muted); font-size:.95rem; line-height:1.75;">
             <li>Once the Family Sharing Unlock feature has been purchased and made available to you, it is non-refundable. Refunds will not be issued after activation or access has been granted.</li>
@@ -809,7 +822,7 @@
             <li>Refunds are generally not available for change-of-mind purchases, partial use of the app, or subscription renewals that have already been processed.</li>
             <li>Subscriptions that are already active may be cancelled at any time, but cancellation does not guarantee a refund for the current billing period.</li>
           </ul>
-          <p style="color:var(--muted); font-size:.95rem; line-height:1.75; margin:0;">To request a refund, email <a href="mailto:support@tracmeds.com" style="color:var(--violet-dark); font-weight:600;">support@tracmeds.com</a> with your order reference, payment date, and a brief explanation. We will review the request and respond within a reasonable timeframe.</p>
+          <p style="color:var(--muted); font-size:.95rem; line-height:1.75; margin:0;">For Android refund requests, email <a href="mailto:support@tracmeds.com" style="color:var(--violet-dark); font-weight:600;">support@tracmeds.com</a> with your order reference, payment date, and a brief explanation. We will review the request and respond within a reasonable timeframe. For iOS refund requests, contact Apple directly using the link above.</p>
         </div>
       </div>
     </section>
@@ -845,6 +858,7 @@
         <a href="#privacy-policy">Privacy Policy</a>
       </nav>
       <span>© 2026 TracMeds. All rights reserved.</span>
+      <span style="font-size:.78rem; color:rgba(255,255,255,.5);">For all support enquiries and grievances, kindly contact: <span style="white-space:nowrap;">Anurag Sinha (Founder) at <a href="mailto:support@tracmeds.com" style="color:rgba(255,255,255,.7); margin:0;">support@tracmeds.com</a></span>.</span>
     </div>
   </footer>
 
