@@ -10,6 +10,8 @@ import AppointmentModal from '@/components/AppointmentModal';
 import HealthLogModal from '@/components/HealthLogModal';
 import MedicineModal from '@/components/MedicineModal';
 import { Appointment, HealthLog, MetricType } from '@/types';
+import { useSubscription } from '@/context/SubscriptionContext';
+import PaywallModal from '@/components/PaywallModal';
 
 // DD/MM/YYYY display
 function formatDate(dateStr: string): string {
@@ -111,10 +113,12 @@ export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { appointments, healthLogs, medicines, addAppointment, addHealthLog, updateHealthLog, addMedicine, profile } = useApp();
+  const { isPro } = useSubscription();
   const [showApptModal, setShowApptModal] = useState(false);
   const [showHealthModal, setShowHealthModal] = useState(false);
   const [showMedModal, setShowMedModal] = useState(false);
   const [healthModalDefaultType, setHealthModalDefaultType] = useState<MetricType>('bp');
+  const [showPaywall, setShowPaywall] = useState(false);
 
   const isWeb = Platform.OS === 'web';
   const topPad = isWeb ? 67 : insets.top;
@@ -192,6 +196,23 @@ export default function HomeScreen() {
             <Text style={[s.quickBtnText, { color: colors.bpColor }]}>Health Log</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Family Sharing CTA */}
+        {!isPro && (
+          <TouchableOpacity style={s.familyBanner} activeOpacity={0.9}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowPaywall(true); }}>
+            <LinearGradient colors={[colors.primary, '#2563EB']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.familyBannerGradient}>
+              <View style={s.familyBannerIcon}>
+                <Ionicons name="people" size={22} color="#fff" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.familyBannerTitle}>Unlock Family Sharing</Text>
+                <Text style={s.familyBannerSub}>Share health updates & reports with loved ones</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#fff" />
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
 
         {/* Active medicines */}
         {activeMeds.length > 0 && (
@@ -286,6 +307,7 @@ export default function HomeScreen() {
       <AppointmentModal visible={showApptModal} onClose={() => setShowApptModal(false)} onSave={addAppointment} />
       <HealthLogModal visible={showHealthModal} defaultType={healthModalDefaultType} onClose={() => setShowHealthModal(false)} onSave={addHealthLog} />
       <MedicineModal visible={showMedModal} onClose={() => setShowMedModal(false)} onSave={addMedicine} />
+      <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} onUnlocked={() => setShowPaywall(false)} />
     </View>
   );
 }
@@ -322,6 +344,11 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     quickBtn: { flex: 1, alignItems: 'center', gap: 8, padding: 14, borderRadius: 16, borderWidth: 1 },
     quickBtnIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
     quickBtnText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
+    familyBanner: { borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 3 },
+    familyBannerGradient: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 },
+    familyBannerIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' },
+    familyBannerTitle: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
+    familyBannerSub: { fontSize: 11, fontFamily: 'Inter_500Medium', color: 'rgba(255,255,255,0.85)', marginTop: 2 },
     medCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, borderRadius: 14, padding: 14, gap: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
     medDot: { width: 10, height: 10, borderRadius: 5 },
     medName: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: colors.foreground },
