@@ -2,7 +2,7 @@
   "expo": {
     "name": "TracMeds",
     "slug": "tracmeds",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "tracmeds",
@@ -19,7 +19,7 @@
     },
     "android": {
       "package": "com.tracmeds.app",
-      "versionCode": 9
+      "versionCode": 10
     },
     "web": {
       "favicon": "./assets/images/icon.png"
