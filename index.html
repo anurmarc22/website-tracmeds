@@ -44,11 +44,10 @@
 </script>
 
 <link rel="manifest" href="manifest.webmanifest" />
-<link rel="icon" type="image/png" sizes="32x32" href="icon.png?v=2" />
-<link rel="shortcut icon" href="icon.png?v=2" type="image/png" />
-<link rel="apple-touch-icon" href="icon.png?v=2" />
-<!-- Fallback SVG favicon in case the PNG is unavailable -->
-<link rel="icon" href="data:image/svg+xml;utf8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2064%2064'%3E%3Crect%20fill='%236f4fd8'%20width='64'%20height='64'/%3E%3Ctext%20x='50%25'%20y='50%25'%20font-size='36'%20font-family='Arial'%20fill='white'%20text-anchor='middle'%20dominant-baseline='central'%3ETM%3C/text%3E%3C/svg%3E" />
+<link rel="icon" type="image/png" sizes="512x512" href="icon.png?v=3" />
+<link rel="icon" type="image/png" sizes="32x32" href="icon.png?v=3" />
+<link rel="shortcut icon" href="icon.png?v=3" type="image/png" />
+<link rel="apple-touch-icon" href="icon.png?v=3" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet" />
@@ -371,8 +370,8 @@
     </div>
   </nav>
 
-  <div style="background:#fbfbfd; border-bottom:1px solid var(--line); color:#12193a; padding:14px 24px; text-align:center; font-size:1rem; line-height:1.5;">
-    <strong>TracMeds is a personal tracking and sharing app and website.</strong> It is not a medical device, diagnostic tool, or provider of medical advice — it simply helps you log and share medicine reminders, appointment visits, and health readings that you enter yourself.
+  <div style="background:var(--navy-900); border-bottom:1px solid rgba(255,255,255,.08); color:rgba(255,255,255,.72); padding:11px 24px; text-align:center; font-size:.86rem; line-height:1.55;">
+    <strong style="color:rgba(255,255,255,.92);">TracMeds is a personal tracking and sharing app and website.</strong> It is not a medical device, diagnostic tool, or provider of medical advice — it simply helps you log and share medicine reminders, appointment visits, and health readings that you enter yourself.
   </div>
 
   <header class="hero" id="top">
@@ -925,7 +924,7 @@
       const cancelUrl = params.get('cancel_url') || 'tracmeds://payment/cancel';
       const orderApiUrl = params.get('order_api_url') || `${SERVER_BASE.replace(/\/$/, '')}/api/checkout/create-order`;
       const verifyApiUrl = params.get('verify_api_url') || `${SERVER_BASE.replace(/\/$/, '')}/api/checkout/verify-payment`;
-      const CHECKOUT_LOGO_URL = new URL('icon.png?v=2', window.location.origin).toString();
+      const CHECKOUT_LOGO_URL = new URL('icon.png?v=3', window.location.origin).toString();
 
       // Map plan to amount in paise
       const PLAN_AMOUNTS = {
