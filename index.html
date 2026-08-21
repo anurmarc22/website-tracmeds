@@ -8,28 +8,40 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <title>TracMeds — Your Daily Family Health Sharing App</title>
-<meta name="description" content="TracMeds is your daily family health sharing app — track medicines, appointments, and health readings, and share a daily summary with the people who matter, straight from your device." />
+<meta name="description" content="TracMeds is your daily family health sharing app, now on iPhone and Android. Download on the App Store or get the Android APK — track medicines, appointments, and health readings, and share a daily summary with the people who matter." />
+<meta name="keywords" content="TracMeds, TracMeds App Store, TracMeds iOS, TracMeds APK, medicine reminder app, medication tracker, family health app, App Store download, Android APK download, Apple Watch medicine reminder" />
+<meta name="author" content="TracMeds" />
+<meta name="geo.region" content="IN" />
 
 <!-- Canonical URL -->
 <link rel="canonical" href="https://www.tracmeds.com/" />
 
-<!-- Explicit indexing permission -->
-<meta name="robots" content="index, follow" />
+<!-- Explicit indexing permission, with rich-result eligibility -->
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+<meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
 
 <!-- Open Graph (controls link previews on WhatsApp, social, etc.) -->
-<meta property="og:title" content="TracMeds — Your Daily Family Health Sharing App" />
-<meta property="og:description" content="Track medicines, appointments, and health readings, and share a daily summary with the people who matter." />
+<meta property="og:title" content="TracMeds — Now on the App Store and Android" />
+<meta property="og:description" content="Track medicines, appointments, and health readings, and share a daily summary with the people who matter. Now on iPhone, Android, and Apple Watch." />
 <meta property="og:url" content="https://www.tracmeds.com/" />
-<meta property="og:image" content="https://www.tracmeds.com/icon.png" />
+<meta property="og:image" content="https://www.tracmeds.com/appstore-link-preview.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="628" />
+<meta property="og:image:alt" content="TracMeds — New launch alert. Ready. Set. Get. Download on the App Store." />
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="TracMeds" />
+<meta property="og:locale" content="en_IN" />
 
 <!-- Twitter card -->
-<meta name="twitter:card" content="summary" />
+<meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:site" content="@tracmeds" />
-<meta name="twitter:title" content="TracMeds — Your Daily Family Health Sharing App" />
-<meta name="twitter:description" content="Track medicines, appointments, and health readings, and share a daily summary with the people who matter." />
-<meta name="twitter:image" content="https://www.tracmeds.com/icon.png" />
+<meta name="twitter:title" content="TracMeds — Now on the App Store and Android" />
+<meta name="twitter:description" content="Track medicines, appointments, and health readings, and share a daily summary with the people who matter. Now on iPhone, Android, and Apple Watch." />
+<meta name="twitter:image" content="https://www.tracmeds.com/appstore-link-preview.png" />
+<meta name="twitter:image:alt" content="TracMeds — New launch alert. Ready. Set. Get. Download on the App Store." />
+
+<!-- App Store smart banner (prompts iOS Safari visitors to open the App Store) -->
+<meta name="apple-itunes-app" content="app-id=6802199272" />
 
 <!-- Structured data: helps Google understand what TracMeds is -->
 <script type="application/ld+json">
@@ -39,9 +51,27 @@
   "name": "TracMeds",
   "url": "https://www.tracmeds.com",
   "description": "TracMeds is your daily family health sharing app — track medicines, appointments, and health readings, and share a daily summary with the people who matter.",
+  "image": "https://www.tracmeds.com/appstore-link-preview.png",
   "applicationCategory": "HealthApplication",
-  "operatingSystem": "iOS, Android",
-  "sameAs": ["https://x.com/tracmeds"]
+  "operatingSystem": "iOS, Android, watchOS",
+  "inLanguage": "en",
+  "publisher": {
+    "@type": "Organization",
+    "name": "TracMeds",
+    "url": "https://www.tracmeds.com/"
+  },
+  "sameAs": ["https://x.com/tracmeds", "https://apps.apple.com/in/app/tracmeds/id6802199272"]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "TracMeds",
+  "operatingSystem": "iOS",
+  "applicationCategory": "HealthApplication",
+  "downloadUrl": "https://apps.apple.com/in/app/tracmeds/id6802199272",
+  "url": "https://apps.apple.com/in/app/tracmeds/id6802199272"
 }
 </script>
 
@@ -118,6 +148,8 @@
     background:var(--capsule); color:#0c1530; font-weight:700; font-size:.92rem;
     padding:10px 20px; border-radius:999px; text-decoration:none; white-space:nowrap;
   }
+  .nav-appstore-badge{ display:inline-flex; align-items:center; flex:none; }
+  .nav-appstore-badge img{ display:block; height:40px; width:auto; }
 
   /* hero */
   .hero{
@@ -142,6 +174,8 @@
   .btn{ display:inline-flex; align-items:center; gap:8px; padding:13px 24px; border-radius:999px; font-weight:700; text-decoration:none; font-size:.96rem; }
   .btn-primary{ background:var(--capsule); color:#0c1530; }
   .btn-secondary{ background:rgba(255,255,255,.08); color:#fff; border:1px solid rgba(255,255,255,.28); }
+  .btn-row-appstore{ display:inline-flex; align-items:center; }
+  .btn-row-appstore img{ height:46px; width:auto; display:block; }
 
   /* Aurora signature wave */
   .aurora-wrap{
@@ -187,6 +221,18 @@
     50%{ transform:translateX(3%) translateY(4%) scale(1.08); }
     100%{ transform:translateX(-3%) translateY(-4%) scale(1); }
   }
+  .hero-appstore-preview{
+    display:block; max-width:760px; margin:28px auto 0; border-radius:22px; overflow:hidden;
+    box-shadow:0 0 0 1px rgba(255,255,255,.14), 0 28px 60px rgba(111,79,216,.4), 0 12px 28px rgba(0,0,0,.45);
+    transition:transform .2s ease, box-shadow .2s ease;
+  }
+  .hero-appstore-preview img{ display:block; width:100%; height:auto; }
+  .hero-appstore-preview:hover{
+    transform:translateY(-3px);
+    box-shadow:0 0 0 1px rgba(255,255,255,.2), 0 34px 70px rgba(111,79,216,.5), 0 16px 34px rgba(0,0,0,.5);
+  }
+  .hero-appstore-badge{ display:flex; justify-content:center; margin:18px auto 0; }
+  .hero-appstore-badge img{ height:48px; width:auto; display:block; }
   @media (prefers-reduced-motion: reduce){
     .aurora-wrap::before, .aurora-label .aurora-name{ animation:none; }
     html{ scroll-behavior:auto; }
@@ -368,7 +414,9 @@
         <a href="#refund-policy">Refund Policy</a>
         <a href="#contact">Contact</a>
       </div>
-      <a id="buy-link" class="nav-cta" href="download.html" rel="noreferrer">Get the app</a>
+      <a class="nav-appstore-badge" href="https://apple.co/4xOYWCl" target="_blank" rel="noopener noreferrer">
+        <img src="appstore-badge.svg" alt="Download on the App Store" />
+      </a>
     </div>
   </nav>
 
@@ -384,7 +432,9 @@
       <div class="btn-row">
         <a id="hero-buy-link" class="btn btn-primary" href="download.html" rel="noreferrer">Get the app</a>
         <a class="btn btn-secondary" href="mailto:support@tracmeds.com">Contact support</a>
-        <button id="install-app-btn" class="btn btn-secondary" type="button" hidden>Install app</button>
+        <a class="btn-row-appstore" href="https://apple.co/4xOYWCl" target="_blank" rel="noopener noreferrer">
+          <img src="appstore-badge.svg" alt="Download on the App Store" />
+        </a>
       </div>
       <p style="margin-top: 18px; color: var(--muted); font-size: .95rem; line-height: 1.6;">Download the app first. Premium family-sharing unlocks later inside the app after purchase.</p>
       <div class="aurora-wrap" aria-hidden="true">
@@ -393,6 +443,12 @@
           <span class="tagline">Your daily family health sharing app</span>
         </div>
       </div>
+      <a class="hero-appstore-preview" href="https://apple.co/4xOYWCl" target="_blank" rel="noopener noreferrer">
+        <img src="appstore-link-preview.png" width="1200" height="628" alt="TracMeds — New launch alert. Ready. Set. Get. Download on the App Store." />
+      </a>
+      <a class="hero-appstore-badge" href="https://apple.co/4xOYWCl" target="_blank" rel="noopener noreferrer">
+        <img src="appstore-badge.svg" alt="Download on the App Store" />
+      </a>
     </div>
   </header>
 
@@ -859,14 +915,10 @@
         <a href="#privacy-policy">Privacy Policy</a>
       </nav>
       <span>© 2026 TracMeds. All rights reserved.</span>
-      <span style="font-size:.78rem; color:rgba(255,255,255,.5);">For all support enquiries and grievances, kindly contact: <span style="white-space:nowrap;">Anurag Sinha (Founder) at <a href="mailto:support@tracmeds.com" style="color:rgba(255,255,255,.7); margin:0;">support@tracmeds.com</a></span>.</span>
     </div>
   </footer>
 
     <script>
-      const installButton = document.getElementById('install-app-btn');
-      let deferredPrompt = null;
-
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function() {
           navigator.serviceWorker.register('./sw.js').catch(function(error) {
@@ -874,36 +926,6 @@
           });
         });
       }
-
-      window.addEventListener('beforeinstallprompt', function(event) {
-        event.preventDefault();
-        deferredPrompt = event;
-        if (installButton) {
-          installButton.hidden = false;
-        }
-      });
-
-      if (installButton) {
-        installButton.addEventListener('click', async function() {
-          if (!deferredPrompt) {
-            window.location.href = 'download.html';
-            return;
-          }
-
-          deferredPrompt.prompt();
-          const choice = await deferredPrompt.userChoice;
-          if (choice.outcome === 'accepted') {
-            installButton.hidden = true;
-          }
-          deferredPrompt = null;
-        });
-      }
-
-      window.addEventListener('appinstalled', function() {
-        if (installButton) {
-          installButton.hidden = true;
-        }
-      });
 
       // Razorpay integration config
       const SERVER_BASE = window.SERVER_BASE || 'https://website-tracmeds-backend-on-render.onrender.com';
