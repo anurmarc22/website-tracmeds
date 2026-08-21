@@ -299,6 +299,42 @@
   .card p{ color:var(--muted); line-height:1.65; margin:0; font-size:.96rem; }
   .card .num{ font-family:'IBM Plex Mono', monospace; font-size:.78rem; color:var(--violet-dark); font-weight:600; display:block; margin-bottom:12px; }
 
+  /* App Store slideshow */
+  .appstore-slideshow-section{ padding:56px 0; }
+  .appstore-slideshow{
+    display:block; position:relative; width:100%; max-width:460px; margin:0 auto;
+    aspect-ratio:1/1; border-radius:26px; overflow:hidden;
+    background:#fff; border:1px solid var(--line);
+    box-shadow:0 0 0 1px rgba(255,255,255,.06), 0 30px 60px rgba(12,21,64,.16), 0 10px 26px rgba(111,79,216,.14);
+    transition:transform .25s ease, box-shadow .25s ease;
+  }
+  .appstore-slideshow:hover{
+    transform:translateY(-4px);
+    box-shadow:0 0 0 1px rgba(255,255,255,.1), 0 38px 74px rgba(12,21,64,.2), 0 14px 32px rgba(111,79,216,.2);
+  }
+  .appstore-slide{
+    position:absolute; inset:0; opacity:0;
+    animation:appstoreSlideFade 24s ease-in-out infinite;
+  }
+  .appstore-slide img{ width:100%; height:100%; object-fit:contain; display:block; }
+  .appstore-slide:nth-child(1){ animation-delay:0s; }
+  .appstore-slide:nth-child(2){ animation-delay:-4s; }
+  .appstore-slide:nth-child(3){ animation-delay:-8s; }
+  .appstore-slide:nth-child(4){ animation-delay:-12s; }
+  .appstore-slide:nth-child(5){ animation-delay:-16s; }
+  .appstore-slide:nth-child(6){ animation-delay:-20s; }
+  @keyframes appstoreSlideFade{
+    0%{ opacity:0; }
+    2%{ opacity:1; }
+    14.2%{ opacity:1; }
+    16.9%{ opacity:0; }
+    100%{ opacity:0; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .appstore-slide{ animation:none; opacity:0; }
+    .appstore-slide:first-child{ opacity:1; }
+  }
+
   /* privacy section */
   .privacy{ background:#fff; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
   .privacy-grid{ display:grid; gap:24px; grid-template-columns:1.1fr 1fr; align-items:stretch; }
@@ -571,6 +607,19 @@
             <p>Send a daily summary straight to family or caregivers over WhatsApp. This premium family-sharing feature unlocks later inside the app after purchase, and each subscription is recorded for support, renewal, and access review.</p>
           </article>
         </div>
+      </div>
+    </section>
+
+    <section class="appstore-slideshow-section" aria-label="TracMeds app preview slideshow">
+      <div class="wrap">
+        <a class="appstore-slideshow" href="https://apple.co/4xOYWCl" target="_blank" rel="noopener noreferrer" aria-label="View TracMeds on the App Store">
+          <div class="appstore-slide"><img src="tracmeds-medicine-reminder-app-hero.png" alt="TracMeds — every dose, every visit, every reading. Your daily family health sharing app." /></div>
+          <div class="appstore-slide"><img src="tracmeds-live-on-app-store.png" alt="TracMeds is live on the App Store — download it and unlock Family Sharing." /></div>
+          <div class="appstore-slide"><img src="tracmeds-no-more-loose-paper.png" alt="No more loose paper — TracMeds keeps medicine reminders and appointment notes in one daily view." /></div>
+          <div class="appstore-slide"><img src="tracmeds-app-features-overview.png" alt="Four habits, one app — reminders, visits, readings, and sharing in TracMeds." /></div>
+          <div class="appstore-slide"><img src="tracmeds-health-data-privacy.png" alt="Your health data stays yours — stored only on your device, no servers, no ad trackers." /></div>
+          <div class="appstore-slide"><img src="tracmeds-splash-screen.png" alt="TracMeds app icon — download on the App Store." /></div>
+        </a>
       </div>
     </section>
 
