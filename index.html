@@ -314,7 +314,7 @@
   }
   .appstore-slide{
     position:absolute; inset:0; opacity:0;
-    animation:appstoreSlideFade 24s ease-in-out infinite;
+    animation:appstoreSlideFade 20s ease-in-out infinite;
   }
   .appstore-slide img{ width:100%; height:100%; object-fit:contain; display:block; }
   .appstore-slide:nth-child(1){ animation-delay:0s; }
@@ -322,12 +322,11 @@
   .appstore-slide:nth-child(3){ animation-delay:-8s; }
   .appstore-slide:nth-child(4){ animation-delay:-12s; }
   .appstore-slide:nth-child(5){ animation-delay:-16s; }
-  .appstore-slide:nth-child(6){ animation-delay:-20s; }
   @keyframes appstoreSlideFade{
     0%{ opacity:0; }
-    2%{ opacity:1; }
-    14.2%{ opacity:1; }
-    16.9%{ opacity:0; }
+    3%{ opacity:1; }
+    17%{ opacity:1; }
+    20%{ opacity:0; }
     100%{ opacity:0; }
   }
   @media (prefers-reduced-motion: reduce){
@@ -618,7 +617,6 @@
           <div class="appstore-slide"><img src="tracmeds-no-more-loose-paper.png" alt="No more loose paper — TracMeds keeps medicine reminders and appointment notes in one daily view." /></div>
           <div class="appstore-slide"><img src="tracmeds-app-features-overview.png" alt="Four habits, one app — reminders, visits, readings, and sharing in TracMeds." /></div>
           <div class="appstore-slide"><img src="tracmeds-health-data-privacy.png" alt="Your health data stays yours — stored only on your device, no servers, no ad trackers." /></div>
-          <div class="appstore-slide"><img src="tracmeds-splash-screen.png" alt="TracMeds app icon — download on the App Store." /></div>
         </a>
       </div>
     </section>
