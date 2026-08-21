@@ -10,12 +10,15 @@
   <title>Download TracMeds APK — Medicine Reminder App for Android, iPhone &amp; Apple Watch</title>
   <meta name="description" content="Download TracMeds for Android (APK) and iPhone (App Store), with a watchOS companion app. Track medicines, appointments, and health readings, and share a daily summary with your family." />
   <meta name="keywords" content="TracMeds, TracMeds APK, TracMeds download, medicine reminder app, medication tracker, family health app, Android APK download, iPhone health app, Apple Watch medicine reminder" />
+  <meta name="author" content="TracMeds" />
+  <meta name="geo.region" content="IN" />
 
   <!-- Canonical URL -->
   <link rel="canonical" href="https://www.tracmeds.com/download.html" />
 
-  <!-- Explicit indexing permission -->
-  <meta name="robots" content="index, follow" />
+  <!-- Explicit indexing permission, with rich-result eligibility -->
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+  <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
 
   <!-- Open Graph (controls link previews on WhatsApp, social, etc.) -->
   <meta property="og:title" content="Download TracMeds — Android, iPhone &amp; Apple Watch" />
@@ -24,8 +27,10 @@
   <meta property="og:image" content="https://www.tracmeds.com/appstore-link-preview.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="628" />
+  <meta property="og:image:alt" content="TracMeds — New launch alert. Ready. Set. Get. Download on the App Store." />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="TracMeds" />
+  <meta property="og:locale" content="en_IN" />
 
   <!-- Twitter card -->
   <meta name="twitter:card" content="summary_large_image" />
@@ -33,6 +38,7 @@
   <meta name="twitter:title" content="Download TracMeds — Android, iPhone &amp; Apple Watch" />
   <meta name="twitter:description" content="Track medicines, appointments, and health readings, and share a daily summary with the people who matter. Now on Android, iPhone, and Apple Watch." />
   <meta name="twitter:image" content="https://www.tracmeds.com/appstore-link-preview.png" />
+  <meta name="twitter:image:alt" content="TracMeds — New launch alert. Ready. Set. Get. Download on the App Store." />
 
   <!-- Structured data: helps Google understand what this page is -->
   <script type="application/ld+json">
@@ -42,11 +48,28 @@
     "name": "TracMeds",
     "url": "https://www.tracmeds.com/download.html",
     "description": "TracMeds is your daily family health sharing app — track medicines, appointments, and health readings, and share a daily summary with the people who matter.",
+    "image": "https://www.tracmeds.com/appstore-link-preview.png",
     "applicationCategory": "HealthApplication",
     "operatingSystem": "iOS, Android, watchOS",
     "softwareVersion": "10.0.0",
     "downloadUrl": "https://github.com/anurmarc22/website-tracmeds/releases/download/v10.0.0/tracmeds.v10.0.0.apk",
+    "inLanguage": "en",
+    "publisher": {
+      "@type": "Organization",
+      "name": "TracMeds",
+      "url": "https://www.tracmeds.com/"
+    },
     "sameAs": ["https://x.com/tracmeds", "https://apps.apple.com/in/app/tracmeds/id6802199272"]
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "TracMeds", "item": "https://www.tracmeds.com/" },
+      { "@type": "ListItem", "position": 2, "name": "Download", "item": "https://www.tracmeds.com/download.html" }
+    ]
   }
   </script>
 
@@ -135,8 +158,16 @@
     .btn[hidden]{ display:none !important; }
     .btn-primary { background: linear-gradient(100deg, var(--violet) 0%, var(--amber) 100%); color: #0c1530; }
     .trouble-link { color: rgba(255, 255, 255, 0.65); font-size: 0.88rem; text-decoration: underline; }
-    .link-preview-card { display: block; margin-top: 8px; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); }
-    .link-preview-card img { display: block; width: 100%; height: auto; }
+    .hero-preview {
+      display: block; margin: 8px auto 26px; border-radius: 20px; overflow: hidden;
+      box-shadow: 0 0 0 1px rgba(255,255,255,.14), 0 24px 50px rgba(111,79,216,.4), 0 10px 24px rgba(0,0,0,.45);
+      transition: transform .2s ease, box-shadow .2s ease;
+    }
+    .hero-preview img { display: block; width: 100%; height: auto; }
+    .hero-preview:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 0 0 1px rgba(255,255,255,.2), 0 30px 60px rgba(111,79,216,.5), 0 14px 30px rgba(0,0,0,.5);
+    }
     .status-box {
       background: rgba(255, 255, 255, 0.04);
       border: 1px solid rgba(242, 169, 27, 0.3);
@@ -146,7 +177,12 @@
     }
     .status-box strong { color: var(--ink); }
     ul { margin: 10px 0 0 18px; color: var(--muted); line-height: 1.7; }
-    .footer-note { font-size: 0.92rem; margin-top: 22px; }
+    .footer-note { font-size: 0.92rem; margin: 22px 0 0; color: var(--muted); }
+    .dl-footer { margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--line); text-align: center; }
+    .dl-footer-links { display: flex; justify-content: center; flex-wrap: wrap; gap: 22px; margin-bottom: 10px; }
+    .dl-footer-links a { display: inline-flex; align-items: center; gap: 7px; color: rgba(255, 255, 255, 0.75); text-decoration: none; font-size: 0.88rem; }
+    .dl-footer-links a:hover { color: #fff; }
+    .dl-footer .copyright { font-size: 0.78rem; color: rgba(255, 255, 255, 0.5); margin: 0; }
     @media (max-width: 640px) {
       .card { padding: 24px; }
       .btn { width: 100%; }
@@ -169,6 +205,10 @@
       <a id="btnPrimary" class="btn btn-primary" href="https://github.com/anurmarc22/website-tracmeds/releases/download/v10.0.0/tracmeds.v10.0.0.apk" download="tracmeds.apk" rel="noopener">Download for Android</a>
     </div>
 
+    <a class="hero-preview" href="https://apps.apple.com/in/app/tracmeds/id6802199272" target="_blank" rel="noopener noreferrer">
+      <img src="appstore-link-preview.png" width="1200" height="628" alt="TracMeds — New launch alert. Ready. Set. Get. Download on the App Store." />
+    </a>
+
     <div class="status-box">
       <strong>How to install — for Android phones only</strong>
       <ul>
@@ -177,11 +217,22 @@
         <li>Tap Install and open TracMeds once it finishes.</li>
       </ul>
       <p style="margin-top: 8px; color: var(--muted);">Works on all major Android brands — Samsung, Xiaomi, Realme, OnePlus, Vivo, Oppo, Motorola, Nothing, Google Pixel, Poco, iQOO, Infinix, Tecno, Honor, Asus, Lava, Micromax & more.</p>
-      <a class="link-preview-card" href="https://apps.apple.com/in/app/tracmeds/id6802199272" target="_blank" rel="noopener noreferrer">
-        <img src="appstore-link-preview.png" alt="TracMeds — New launch alert. Ready. Set. Get. Download on the App Store." />
-      </a>
-      <p style="margin-top: 8px;">The app includes premium family-sharing access that can be unlocked later through the in-app purchase flow, with subscription records managed inside the app.</p>
-      <p style="margin-top: 8px;"><a href="mailto:support@tracmeds.com" style="color: var(--violet); font-weight: 700;">support@tracmeds.com</a></p>
+    </div>
+
+    <p class="footer-note">The app includes premium family-sharing access that can be unlocked later through the in-app purchase flow, with subscription records managed inside the app.</p>
+
+    <div class="dl-footer">
+      <div class="dl-footer-links">
+        <a href="https://www.tracmeds.com">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.5 4 5.8 4 9s-1.5 6.5-4 9c-2.5-2.5-4-5.8-4-9s1.5-6.5 4-9z"/></svg>
+          www.tracmeds.com
+        </a>
+        <a href="mailto:support@tracmeds.com">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+          support@tracmeds.com
+        </a>
+      </div>
+      <p class="copyright">© 2026 TracMeds. All rights reserved.</p>
     </div>
   </main>
   <script>
