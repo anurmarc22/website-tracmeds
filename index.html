@@ -673,7 +673,7 @@
         <div class="legal-doc">
           <div class="doc-head">
             <h3>Privacy Policy</h3>
-            <span class="updated">Effective: 13 August 2026 · Version 1.3</span>
+            <span class="updated">Effective: 30 August 2026 · Version 1.4</span>
           </div>
           <p style="color:var(--muted); font-size:.95rem; line-height:1.75; padding-bottom:8px;">This policy explains how TracMeds ("the App") handles information when you track medicines, appointments, and health readings, and when you choose to share them. It applies to the Android and iOS apps, including the Apple Watch companion app, and to www.tracmeds.com. Subscription and purchase handling differs by platform: on iOS, purchases are processed through Apple's In-App Purchase system via RevenueCat; on Android, purchases are processed through Razorpay. Platform-specific details are set out below.</p>
 
@@ -682,6 +682,7 @@
             <div class="legal-body">
               <ul>
                 <li>All health data — medicines, appointments, health readings, and any contacts you save for sharing — is stored exclusively on your device using local on-device storage. No health data is transmitted to any server, database, or third party.</li>
+                <li>This includes reproductive health data — menstrual cycle dates, cycle length, and period predictions — if you use the Period Reminders feature. Like all other health data, this stays exclusively on your device and is never transmitted anywhere.</li>
                 <li>On iOS, this includes entries logged directly on the Apple Watch companion app — such as exercise, readings, or reminders logged while away from your iPhone — which are stored locally on the Watch and sync to your iPhone automatically once the two devices reconnect.</li>
                 <li>TracMeds does not collect, store, process, or have access to your <strong>health</strong> information — that stays exclusively on your device (iPhone or Apple Watch), as described above. Billing information (see "Subscriptions" below) is handled separately and is collected as part of processing your payment.</li>
                 <li>For paid access, the app may keep only a minimal local record of the selected plan, purchase status, and purchase timestamp to support access review, support requests, renewals, and refund handling. This is separate from your health or personal data.</li>
@@ -700,7 +701,7 @@
           <details class="legal-item">
             <summary>Notifications<span class="plus">+</span></summary>
             <div class="legal-body">
-              <p>Reminder notifications are delivered through Expo's notification service, using only the minimum device token needed to send them. This is a delivery mechanism, not a data-collection tool — your medicine and appointment content is not transmitted through it.</p>
+              <p>Reminder notifications — for medicines, appointments, exercise, health metrics, and Period Reminders — are scheduled and delivered entirely on your device, using your operating system's own local notification system. No device token, push-notification service, or remote server is used to deliver them: your device generates and fires each reminder locally, and no data is transmitted off your device for this purpose.</p>
             </div>
           </details>
 
@@ -713,9 +714,18 @@
           </details>
 
           <details class="legal-item">
+            <summary>Records<span class="plus">+</span></summary>
+            <div class="legal-body">
+              <p>Photos and PDFs you upload to Records — such as prescriptions or lab reports — are stored only on your device, the same as your other health data. They are never transmitted automatically to any server, and are not backed up to any cloud service.</p>
+              <p>Records are shared only when you explicitly choose to, using your own device's sharing tools (such as the iOS Share Sheet) to send a copy to an app, contact, or service you select. TracMeds has no visibility into, control over, or storage of a Record once you've shared it.</p>
+              <p>Because Records are stored only on your device, they are permanently lost if you uninstall the app or switch devices — the same as your other health data — unless you export or share them first.</p>
+            </div>
+          </details>
+
+          <details class="legal-item">
             <summary>Subscriptions<span class="plus">+</span></summary>
             <div class="legal-body">
-              <p><strong>iOS:</strong> If you choose a paid plan on iOS, your purchase is processed entirely through Apple's In-App Purchase system, managed via RevenueCat. TracMeds never receives or stores your payment card details — Apple handles billing directly. RevenueCat receives only a purchase and subscription identifier and entitlement status, used solely to verify and manage your Family Sharing Unlock access. Apple, not TracMeds, issues your purchase receipt and handles GST for App Store transactions in India.</p>
+              <p><strong>iOS:</strong> If you choose a paid plan on iOS, your purchase is processed entirely through Apple's In-App Purchase system, managed via RevenueCat. TracMeds never receives or stores your payment card details — Apple handles billing directly. RevenueCat receives only a purchase and subscription identifier and entitlement status, used solely to verify and manage your TracMeds Full Access+ subscription. Apple, not TracMeds, issues your purchase receipt and handles GST for App Store transactions in India.</p>
               <p><strong>Android:</strong> If you choose a paid plan on Android, your subscription and payment are handled through Razorpay on www.tracmeds.com. Razorpay processes payments securely; TracMeds does not receive or store your payment card details. At checkout, we collect your name, phone number, and email for every purchase — this is required to process payment, generate your invoice, verify your access, and enable "Restore Purchase" on a new or reinstalled device. If you request a GST invoice, we additionally collect your GSTIN. We also record your device identifier against your purchase to enforce the reinstall limit described in the Terms of Service. This information is stored with the payment record on Razorpay and/or in a secure internal record.</p>
             </div>
           </details>
@@ -835,6 +845,7 @@
           <details class="legal-item">
             <summary>Subscriptions &amp; payments<span class="plus">+</span></summary>
             <div class="legal-body">
+              <p>TracMeds Full Access+ is an optional paid subscription that unlocks: Daily Health Report sharing (via WhatsApp or Share Message), Records sharing, Period Reminders, and reminders for Exercise, Blood Pressure, Blood Sugar, Temperature, and Heart Rate, plus exporting your data. Medicine reminders are always free, regardless of subscription status — they are never gated behind TracMeds Full Access+.</p>
               <p><strong>iOS:</strong> Paid features on iOS are billed and managed entirely through Apple's In-App Purchase system. Billing, renewal, and cancellation follow Apple's policies — manage or cancel your subscription anytime via Settings → [your name] → Subscriptions on your iPhone. TracMeds does not receive or store your payment card details. RevenueCat manages your entitlement status, and basic subscription records may be kept to support access review and support requests.</p>
               <p><strong>Android:</strong> Paid features on Android are billed and managed through Razorpay on www.tracmeds.com. Billing, renewal, and cancellation follow Razorpay's policies — manage or cancel subscriptions through Razorpay's customer portal or the payment confirmation emails. TracMeds does not receive or store your payment card details, and basic subscription records may be kept locally in the app to support access review, support requests, and refund handling.</p>
             </div>
@@ -844,7 +855,7 @@
             <summary>Device changes &amp; reinstalls<span class="plus">+</span></summary>
             <div class="legal-body">
               <p>Since all data is stored locally on your device, changing your phone or reinstalling the app permanently deletes your existing medicines, appointments, and health readings. This includes any entries logged on the Apple Watch companion app that had not yet synced to your iPhone before the change — <strong>we strongly recommend ensuring your Watch has synced, and exporting your readings, before you reinstall the app or switch to a new device.</strong></p>
-              <p><strong>iOS:</strong> If you have an active subscription, you can restore your Family Sharing Unlock access on any device signed in with the same Apple ID, at no extra cost and with no limit on the number of restores, using the "Restore Purchase" option in the app. This follows Apple's standard purchase-restoration rules.</p>
+              <p><strong>iOS:</strong> If you have an active subscription, you can restore your TracMeds Full Access+ subscription on any device signed in with the same Apple ID, at no extra cost and with no limit on the number of restores, using the "Restore Purchase" option in the app. This follows Apple's standard purchase-restoration rules.</p>
               <p><strong>Android:</strong> If you have an active subscription, you may restore access on a new or reinstalled device at no extra cost, provided the email and phone number match your original purchase. This is limited to <strong>3 device changes or reinstalls per subscription</strong>. Once you have used all 3, any further device change or reinstall — even if you are still within your current subscription period — will require purchasing a new plan to regain access.</p>
             </div>
           </details>
@@ -860,6 +871,7 @@
             <summary>Termination<span class="plus">+</span></summary>
             <div class="legal-body">
               <p>You may stop using TracMeds at any time by uninstalling it. Since all data is stored locally on your device, uninstalling permanently deletes it. The app's owner reserves the right to discontinue the app at any time.</p>
+              <p>We reserve the right to discontinue or suspend the Service at any time. Subscribers with an active paid period will retain access through the remainder of that period, or receive a refund, subject to Apple's and Razorpay's respective refund policies.</p>
             </div>
           </details>
 
@@ -920,7 +932,7 @@
           <p style="color:var(--ink); font-weight:700; font-size:1rem; margin:18px 0 8px;">For Android purchases (Razorpay)</p>
           <p style="color:var(--muted); font-size:.95rem; line-height:1.75; padding-bottom:8px;">Refunds are considered only for payments made in error, duplicate charges, or where the app is not usable due to a confirmed technical issue on our side.</p>
           <ul style="margin:0 0 12px; padding-left:20px; color:var(--muted); font-size:.95rem; line-height:1.75;">
-            <li>Once the Family Sharing Unlock feature has been purchased and made available to you, it is non-refundable. Refunds will not be issued after activation or access has been granted.</li>
+            <li>Once the TracMeds Full Access+ feature has been purchased and made available to you, it is non-refundable. Refunds will not be issued after activation or access has been granted.</li>
             <li>If you believe you were charged twice, or if the payment was made by mistake, contact us within 7 days and we will review the request.</li>
             <li>If the app fails due to a verified bug or technical issue that prevents basic use, we may offer a refund or credit after review.</li>
             <li>Refunds are generally not available for change-of-mind purchases, partial use of the app, or subscription renewals that have already been processed.</li>
