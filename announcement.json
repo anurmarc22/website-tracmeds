@@ -1,6 +1,6 @@
 {
   "id": "2026-09-report-card",
   "message": "New: Health Report Card is here! Share your progress with family.",
-  "active": true,
+  "active": false,
   "actionUrl": "https://apps.apple.com/app/id6802199272"
 }
