@@ -693,7 +693,7 @@
         <div class="legal-doc">
           <div class="doc-head">
             <h3>Privacy Policy</h3>
-            <span class="updated">Effective: 30 August 2026 · Version 1.4</span>
+            <span class="updated">Effective: 8 September 2026 · Version 1.5</span>
           </div>
           <p style="color:var(--muted); font-size:.95rem; line-height:1.75; padding-bottom:8px;">This policy explains how TracMeds ("the App") handles information when you track medicines, appointments, and health readings, and when you choose to share them. It applies to the Android and iOS apps, including the Apple Watch companion app, and to www.tracmeds.com. Subscription and purchase handling differs by platform: on iOS, purchases are processed through Apple's In-App Purchase system via RevenueCat; on Android, purchases are processed through Razorpay. Platform-specific details are set out below.</p>
 
@@ -714,7 +714,7 @@
           <details class="legal-item">
             <summary>What we don't run<span class="plus">+</span></summary>
             <div class="legal-body">
-              <p>No analytics, crash-reporting, advertising identifiers, or tracking technologies are embedded in TracMeds — no Firebase, Google Analytics, Crashlytics, AdMob, or similar SDKs, on either Android or iOS.</p>
+              <p>No analytics, crash-reporting, advertising identifiers, or tracking technologies are embedded in TracMeds — no Firebase, Google Analytics, Crashlytics, AdMob, or similar SDKs, on either Android or iOS. See "Advertising attribution (iOS only)" below for one narrow exception specific to the iOS app.</p>
             </div>
           </details>
 
@@ -726,10 +726,10 @@
           </details>
 
           <details class="legal-item">
-            <summary>Sharing via WhatsApp<span class="plus">+</span></summary>
+            <summary>Sharing via Messages, WhatsApp, or Telegram<span class="plus">+</span></summary>
             <div class="legal-body">
-              <p>Daily report sharing is entirely user-initiated. Tapping "share" opens WhatsApp on your own device with a pre-filled message, sent from your own WhatsApp account to a contact you choose. TracMeds has no visibility into, control over, or storage of any message once it's handed to WhatsApp.</p>
-              <p>WhatsApp is a separate third-party service operated by Meta Platforms, Inc., governed by its own Terms of Service and Privacy Policy. TracMeds is not affiliated with, endorsed by, or in partnership with WhatsApp or Meta.</p>
+              <p>Daily report sharing is entirely user-initiated. On iOS, tapping "share" opens your chosen app — Messages, WhatsApp, or Telegram — with your message ready to send: pre-filled for Messages and WhatsApp, or copied to your clipboard for you to paste into Telegram, since Telegram's link format doesn't support pre-filling text. On Android, tapping "share" opens WhatsApp with a pre-filled message. In every case, it's sent from your own account to a contact you choose, and TracMeds has no visibility into, control over, or storage of any message once it's handed to the destination app.</p>
+              <p>Messages is part of Apple's own iOS, governed by Apple's own terms and privacy policy. WhatsApp is a separate third-party service operated by Meta Platforms, Inc., governed by its own Terms of Service and Privacy Policy. Telegram is a separate third-party service operated by Telegram, governed by its own Terms of Service and Privacy Policy. TracMeds is not affiliated with, endorsed by, or in partnership with Apple Messages, WhatsApp, Meta, or Telegram.</p>
             </div>
           </details>
 
@@ -751,12 +751,19 @@
           </details>
 
           <details class="legal-item">
+            <summary>Advertising attribution (iOS only)<span class="plus">+</span></summary>
+            <div class="legal-body">
+              <p>On iOS, TracMeds uses RevenueCat's integration with Apple's own AdServices framework to measure the effectiveness of Apple Search Ads campaigns, when running. This collects a single anonymous attribution token — tied to an anonymous install identifier, not to your name, email, health data, or any personal information — indicating which ad campaign, if any, led to your install or subscription. Apple's AdServices framework is designed by Apple not to require App Tracking Transparency consent, and TracMeds does not separately track you across other apps or websites for advertising purposes. This does not apply to the Android app.</p>
+            </div>
+          </details>
+
+          <details class="legal-item">
             <summary>Your choices<span class="plus">+</span></summary>
             <div class="legal-body">
               <ul>
                 <li>Uninstalling the app permanently deletes all locally stored data, since nothing is kept anywhere else.</li>
                 <li>You can turn off notifications at any time from your device settings.</li>
-                <li>You decide exactly what to include in any message shared via WhatsApp, and to whom.</li>
+                <li>You decide exactly what to include in any message shared via Messages, WhatsApp, or Telegram on iOS, or WhatsApp on Android, and to whom.</li>
               </ul>
             </div>
           </details>
@@ -797,7 +804,7 @@
         <div class="legal-doc">
           <div class="doc-head">
             <h3>Terms of Service</h3>
-            <span class="updated">Effective: 6 September 2026 · Version 1.3</span>
+            <span class="updated">Effective: 8 September 2026 · Version 1.4</span>
           </div>
 
           <details class="legal-item" open>
@@ -820,7 +827,8 @@
             <summary>No liability, under any circumstances<span class="plus">+</span></summary>
             <div class="legal-body">
               <p>To the maximum extent permitted by applicable law: TracMeds, its owner, its developer, its affiliates, licensors, employees, agents, contractors, and any person or entity associated with the development, distribution, or maintenance of TracMeds — across the iPhone app, the Apple Watch companion app, the Android app, and www.tracmeds.com — shall not be liable for any direct, indirect, incidental, special, consequential, exemplary, punitive, or other damages of any kind, arising out of or in any way connected with the app or its functioning — under any circumstances.</p>
-              <p>This applies regardless of the legal theory — contract, tort (including negligence), strict liability, or otherwise — even where advised of the possibility of such damages, and covers (without limitation): missed medications or dosage errors, incorrect health readings or data entry, missed or delayed medical appointments, reminders that failed to trigger on iPhone or Apple Watch, delays or failures in syncing data between the Apple Watch and iPhone, loss of any entry logged on the Apple Watch that was never synced to the iPhone (including due to the Watch being lost, damaged, reset, or never reconnected), discrepancies between data shown on the Watch and the iPhone due to sync timing, WhatsApp message delivery failures or unintended disclosures, loss of data due to device failure, uninstalling, or app error, and any other health, financial, or consequential loss.</p>
+              <p>This applies regardless of the legal theory — contract, tort (including negligence), strict liability, or otherwise — even where advised of the possibility of such damages, and covers (without limitation): missed medications or dosage errors, incorrect health readings or data entry, missed or delayed medical appointments, reminders that failed to trigger on iPhone or Apple Watch, delays or failures in syncing data between the Apple Watch and iPhone, loss of any entry logged on the Apple Watch that was never synced to the iPhone (including due to the Watch being lost, damaged, reset, or never reconnected), discrepancies between data shown on the Watch and the iPhone due to sync timing, Messages, WhatsApp, or Telegram message delivery failures or unintended disclosures, loss of data due to device failure, uninstalling, or app error, and any other health, financial, or consequential loss.</p>
+              <p>This also covers, without limitation: calculation errors or inaccuracies in any adherence percentage, streak count, milestone, or other computed statistic; technical or software bugs, defects, or malfunctions in any medicine, appointment, health-reading, exercise, or menstrual-cycle tracking feature; failures or inaccuracies in any reminder, notification, congratulatory message, or streak-milestone feature; and errors, omissions, or malfunctions in any generated report, exported file, or shareable card. The app's owner, developer, and affiliates are not liable for any consequence arising from reliance on any such calculation, statistic, report, or export.</p>
               <p>TracMeds is provided "as is" and "as available," without warranties of any kind, express or implied, including implied warranties of merchantability, fitness for a particular purpose, accuracy, reliability, or non-infringement. The app's owner and developer do not warrant that the app will be uninterrupted, error-free, secure, or free of harmful components.</p>
             </div>
           </details>
@@ -832,7 +840,7 @@
               <ul>
                 <li>The accuracy and completeness of all health data, medication details, dosages, and appointment information you enter.</li>
                 <li>Verifying all medication names, dosages, schedules, and reminders with a licensed healthcare provider before acting on them.</li>
-                <li>Using WhatsApp sharing only with contacts who have consented to receive health-related messages from you.</li>
+                <li>Using Messages, WhatsApp, or Telegram sharing (iOS) or WhatsApp sharing (Android) only with contacts who have consented to receive health-related messages from you.</li>
                 <li>Complying with applicable local laws regarding health-information sharing.</li>
                 <li>The security of the device the app is installed on.</li>
                 <li>Not relying on TracMeds as your sole system for critical medication management, without professional oversight.</li>
@@ -856,7 +864,7 @@
               <ul>
                 <li>Use TracMeds for any unlawful, unfair, anti-security, or otherwise prohibited purpose, under any local, national, or international law.</li>
                 <li>Reverse-engineer, decompile, or attempt to extract the app's source code.</li>
-                <li>Use the app to send unsolicited messages or spam via WhatsApp.</li>
+                <li>Use the app to send unsolicited messages or spam via Messages, WhatsApp, or Telegram.</li>
                 <li>Impersonate any person or misrepresent your affiliation with any entity.</li>
                 <li>Use the app for commercial purposes without written permission from the owner.</li>
               </ul>
@@ -866,7 +874,7 @@
           <details class="legal-item">
             <summary>Subscriptions &amp; payments<span class="plus">+</span></summary>
             <div class="legal-body">
-              <p>TracMeds Full Access+ is an optional paid subscription that unlocks: Daily Health Report sharing (via WhatsApp or Share Message), Records sharing, Period Reminders, and reminders for Exercise, Blood Pressure, Blood Sugar, Temperature, and Heart Rate, plus exporting your data. Medicine reminders are always free, regardless of subscription status — they are never gated behind TracMeds Full Access+.</p>
+              <p>TracMeds Full Access+ is an optional paid subscription that unlocks: Daily Health Report sharing (via Messages, WhatsApp, or Telegram on iOS, or WhatsApp on Android), Records sharing, Period Reminders, and reminders for Exercise, Blood Pressure, Blood Sugar, Temperature, and Heart Rate, plus exporting your data. Medicine reminders are always free, regardless of subscription status — they are never gated behind TracMeds Full Access+.</p>
               <p><strong>iOS:</strong> Paid features on iOS are billed and managed entirely through Apple's In-App Purchase system. Billing, renewal, and cancellation follow Apple's policies — manage or cancel your subscription anytime via Settings → [your name] → Subscriptions on your iPhone. TracMeds does not receive or store your payment card details. RevenueCat manages your entitlement status, and basic subscription records may be kept to support access review and support requests.</p>
               <p><strong>Android:</strong> Paid features on Android are billed and managed through Razorpay on www.tracmeds.com. Billing, renewal, and cancellation follow Razorpay's policies — manage or cancel subscriptions through Razorpay's customer portal or the payment confirmation emails. TracMeds does not receive or store your payment card details, and basic subscription records may be kept locally in the app to support access review, support requests, and refund handling.</p>
             </div>
