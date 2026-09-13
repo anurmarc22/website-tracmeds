@@ -693,9 +693,9 @@
         <div class="legal-doc">
           <div class="doc-head">
             <h3>Privacy Policy</h3>
-            <span class="updated">Effective: 8 September 2026 · Version 1.5</span>
+            <span class="updated">Effective: 13 September 2026 · Version 1.6</span>
           </div>
-          <p style="color:var(--muted); font-size:.95rem; line-height:1.75; padding-bottom:8px;">This policy explains how TracMeds ("the App") handles information when you track medicines, appointments, and health readings, and when you choose to share them. It applies to the Android and iOS apps, including the Apple Watch companion app, and to www.tracmeds.com. Subscription and purchase handling differs by platform: on iOS, purchases are processed through Apple's In-App Purchase system via RevenueCat; on Android, purchases are processed through Razorpay. Platform-specific details are set out below.</p>
+          <p style="color:var(--muted); font-size:.95rem; line-height:1.75; padding-bottom:8px;">This policy explains how TracMeds ("the App") handles information when you track medicines, appointments, and health readings, and when you choose to share them. It applies to the Android and iOS apps, including the Apple Watch companion app, and to www.tracmeds.com. Subscription and purchase handling differs by platform: on iOS, purchases are processed through Apple's In-App Purchase system via RevenueCat; on Android via the Google Play Store, purchases are processed through Google Play's billing system, integrated via RevenueCat; on Android via the direct-download APK, purchases are processed through Razorpay. Platform-specific details are set out below.</p>
 
           <details class="legal-item" open>
             <summary>Data storage — on your device only<span class="plus">+</span></summary>
@@ -746,7 +746,8 @@
             <summary>Subscriptions<span class="plus">+</span></summary>
             <div class="legal-body">
               <p><strong>iOS:</strong> If you choose a paid plan on iOS, your purchase is processed entirely through Apple's In-App Purchase system, managed via RevenueCat. TracMeds never receives or stores your payment card details — Apple handles billing directly. RevenueCat receives only a purchase and subscription identifier and entitlement status, used solely to verify and manage your TracMeds Full Access+ subscription. Apple, not TracMeds, issues your purchase receipt and handles GST for App Store transactions in India.</p>
-              <p><strong>Android:</strong> If you choose a paid plan on Android, your subscription and payment are handled through Razorpay on www.tracmeds.com. Razorpay processes payments securely; TracMeds does not receive or store your payment card details. At checkout, we collect your name, phone number, and email for every purchase — this is required to process payment, generate your invoice, verify your access, and enable "Restore Purchase" on a new or reinstalled device. If you request a GST invoice, we additionally collect your GSTIN. We also record your device identifier against your purchase to enforce the reinstall limit described in the Terms of Service. This information is stored with the payment record on Razorpay and/or in a secure internal record.</p>
+              <p><strong>Android (Google Play Store):</strong> Where premium TracMeds Full Access+ features are purchased through the Google Play Store version of the app, billing is handled by Google Play, integrated via RevenueCat. We never receive your card details, name, phone number, or email — Google handles billing and receipts directly. RevenueCat receives only a purchase token and entitlement status (active/expired) to unlock TracMeds Full Access+, tied to your Google Account, not your device.</p>
+              <p><strong>Android (direct-download APK):</strong> If you install TracMeds via the APK made available on www.tracmeds.com, your subscription and payment are handled through Razorpay on the website. Razorpay processes payments securely; TracMeds does not receive or store your payment card details. At checkout, we collect your name, phone number, and email for every purchase — this is required to process payment, generate your invoice, verify your access, and enable "Restore Purchase" on a new or reinstalled device. If you request a GST invoice, we additionally collect your GSTIN. We also record your device identifier against your purchase to enforce the reinstall limit described in the Terms of Service. This information is stored with the payment record on Razorpay and/or in a secure internal record.</p>
             </div>
           </details>
 
@@ -804,7 +805,7 @@
         <div class="legal-doc">
           <div class="doc-head">
             <h3>Terms of Service</h3>
-            <span class="updated">Effective: 8 September 2026 · Version 1.4</span>
+            <span class="updated">Effective: 13 September 2026 · Version 1.5</span>
           </div>
 
           <details class="legal-item" open>
@@ -876,7 +877,8 @@
             <div class="legal-body">
               <p>TracMeds Full Access+ is an optional paid subscription that unlocks: Daily Health Report sharing (via Messages, WhatsApp, or Telegram on iOS, or WhatsApp on Android), Records sharing, Period Reminders, and reminders for Exercise, Blood Pressure, Blood Sugar, Temperature, and Heart Rate, plus exporting your data. Medicine reminders are always free, regardless of subscription status — they are never gated behind TracMeds Full Access+.</p>
               <p><strong>iOS:</strong> Paid features on iOS are billed and managed entirely through Apple's In-App Purchase system. Billing, renewal, and cancellation follow Apple's policies — manage or cancel your subscription anytime via Settings → [your name] → Subscriptions on your iPhone. TracMeds does not receive or store your payment card details. RevenueCat manages your entitlement status, and basic subscription records may be kept to support access review and support requests.</p>
-              <p><strong>Android:</strong> Paid features on Android are billed and managed through Razorpay on www.tracmeds.com. Billing, renewal, and cancellation follow Razorpay's policies — manage or cancel subscriptions through Razorpay's customer portal or the payment confirmation emails. TracMeds does not receive or store your payment card details, and basic subscription records may be kept locally in the app to support access review, support requests, and refund handling.</p>
+              <p><strong>Android (Google Play Store):</strong> Paid features on the Google Play Store version are billed and managed entirely through Google Play's billing system, integrated via RevenueCat. Billing, renewal, and cancellation follow Google Play's policies — manage or cancel your subscription anytime via the Google Play app or play.google.com/store/account/subscriptions. TracMeds does not receive or store your payment card details.</p>
+              <p><strong>Android (direct-download APK):</strong> Paid features on the APK version are billed and managed through Razorpay on www.tracmeds.com. Billing, renewal, and cancellation follow Razorpay's policies — manage or cancel subscriptions through Razorpay's customer portal or the payment confirmation emails. TracMeds does not receive or store your payment card details, and basic subscription records may be kept locally in the app to support access review, support requests, and refund handling.</p>
             </div>
           </details>
 
@@ -885,7 +887,8 @@
             <div class="legal-body">
               <p>Since all data is stored locally on your device, changing your phone or reinstalling the app permanently deletes your existing medicines, appointments, and health readings. This includes any entries logged on the Apple Watch companion app that had not yet synced to your iPhone before the change — <strong>we strongly recommend ensuring your Watch has synced, and exporting your readings, before you reinstall the app or switch to a new device.</strong></p>
               <p><strong>iOS:</strong> If you have an active subscription, you can restore your TracMeds Full Access+ subscription on any device signed in with the same Apple ID, at no extra cost and with no limit on the number of restores, using the "Restore Purchase" option in the app. This follows Apple's standard purchase-restoration rules.</p>
-              <p><strong>Android:</strong> If you have an active subscription, you may restore access on a new or reinstalled device at no extra cost, provided the email and phone number match your original purchase. This is limited to <strong>3 device changes or reinstalls per subscription</strong>. Once you have used all 3, any further device change or reinstall — even if you are still within your current subscription period — will require purchasing a new plan to regain access.</p>
+              <p><strong>Android (Google Play Store):</strong> If you have an active subscription, it can be restored at any time, with no limit on the number of devices, as long as you sign in with the same Google Account used for the original purchase. This is handled automatically by Google Play — no device cap, no need to re-enter payment details.</p>
+              <p><strong>Android (direct-download APK):</strong> If you have an active subscription, you may restore access on a new or reinstalled device at no extra cost, provided the email and phone number match your original purchase. This is limited to <strong>3 device changes or reinstalls per subscription</strong>. Once you have used all 3, any further device change or reinstall — even if you are still within your current subscription period — will require purchasing a new plan to regain access.</p>
             </div>
           </details>
 
@@ -900,7 +903,7 @@
             <summary>Termination<span class="plus">+</span></summary>
             <div class="legal-body">
               <p>You may stop using TracMeds at any time by uninstalling it. Since all data is stored locally on your device, uninstalling permanently deletes it. The app's owner reserves the right to discontinue the app at any time.</p>
-              <p>We reserve the right to discontinue or suspend the Service at any time. Subscribers with an active paid period will retain access through the remainder of that period, or receive a refund, subject to Apple's and Razorpay's respective refund policies.</p>
+              <p>We reserve the right to discontinue or suspend the Service at any time. Subscribers with an active paid period will retain access through the remainder of that period, or receive a refund, subject to Apple's, Google Play's, or Razorpay's respective refund policies, depending on how the subscription was purchased.</p>
             </div>
           </details>
 
@@ -942,14 +945,14 @@
           <span class="kicker">Legal · Refunds</span>
           <div class="capsule-rule"></div>
           <h2>Refund Policy</h2>
-          <p>Refund handling depends on how you purchased — Apple manages refunds for iOS, and we manage them directly for Android purchases made via Razorpay.</p>
+          <p>Refund handling depends on how you purchased — Apple manages refunds for iOS, Google manages refunds for Google Play Store purchases, and we manage them directly for Android purchases made via Razorpay (direct-download APK).</p>
         </div>
         <div class="legal-doc">
           <div class="doc-head">
             <h3>Refund Policy</h3>
-            <span class="updated">Effective: 13 August 2026 · Version 1.2</span>
+            <span class="updated">Effective: 13 September 2026 · Version 1.3</span>
           </div>
-          <p style="color:var(--muted); font-size:.95rem; line-height:1.75; padding-bottom:8px;">Refund handling differs by platform, since Apple and Razorpay each control their own payment and refund process.</p>
+          <p style="color:var(--muted); font-size:.95rem; line-height:1.75; padding-bottom:8px;">Refund handling differs by platform, since Apple, Google Play, and Razorpay each control their own payment and refund process.</p>
 
           <p style="color:var(--ink); font-weight:700; font-size:1rem; margin:18px 0 8px;">For iOS purchases (Apple In-App Purchase)</p>
           <ul style="margin:0 0 12px; padding-left:20px; color:var(--muted); font-size:.95rem; line-height:1.75;">
@@ -958,7 +961,15 @@
             <li>Apple's own refund policies, review process, and timelines apply to all iOS purchases.</li>
           </ul>
 
-          <p style="color:var(--ink); font-weight:700; font-size:1rem; margin:18px 0 8px;">For Android purchases (Razorpay)</p>
+          <p style="color:var(--ink); font-weight:700; font-size:1rem; margin:18px 0 8px;">For Android purchases via the Google Play Store</p>
+          <p style="color:var(--muted); font-size:.95rem; line-height:1.75; padding-bottom:8px;">TracMeds Full Access+ purchased through the Google Play Store is billed and processed entirely through Google Play. Once activated, it is non-refundable except as approved through Google Play's own refund process, which is managed entirely by Google — not by us.</p>
+          <ul style="margin:0 0 12px; padding-left:20px; color:var(--muted); font-size:.95rem; line-height:1.75;">
+            <li>All Google Play Store purchases are processed by Google. Google has sole authority over approving or denying refunds — TracMeds does not process, approve, or deny refunds for these purchases directly.</li>
+            <li>In the event of discontinuation of the app or a feature, any active subscription purchased on Google Play is handled according to Google Play's own subscription and refund policies for the remaining active period.</li>
+            <li>To request a refund, or to manage or cancel your subscription, use the <a href="https://play.google.com/store/account/subscriptions" target="_blank" rel="noreferrer" style="color:var(--violet-dark); font-weight:600;">Google Play subscriptions page</a>, signed in with the Google Account used for the purchase.</li>
+          </ul>
+
+          <p style="color:var(--ink); font-weight:700; font-size:1rem; margin:18px 0 8px;">For Android purchases via the direct-download APK (Razorpay)</p>
           <p style="color:var(--muted); font-size:.95rem; line-height:1.75; padding-bottom:8px;">Refunds are considered only for payments made in error, duplicate charges, or where the app is not usable due to a confirmed technical issue on our side.</p>
           <ul style="margin:0 0 12px; padding-left:20px; color:var(--muted); font-size:.95rem; line-height:1.75;">
             <li>Once the TracMeds Full Access+ feature has been purchased and made available to you, it is non-refundable. Refunds will not be issued after activation or access has been granted.</li>
@@ -967,7 +978,7 @@
             <li>Refunds are generally not available for change-of-mind purchases, partial use of the app, or subscription renewals that have already been processed.</li>
             <li>Subscriptions that are already active may be cancelled at any time, but cancellation does not guarantee a refund for the current billing period.</li>
           </ul>
-          <p style="color:var(--muted); font-size:.95rem; line-height:1.75; margin:0;">For Android refund requests, email <a href="mailto:support@tracmeds.com" style="color:var(--violet-dark); font-weight:600;">support@tracmeds.com</a> with your order reference, payment date, and a brief explanation. We will review the request and respond within a reasonable timeframe. For iOS refund requests, contact Apple directly using the link above.</p>
+          <p style="color:var(--muted); font-size:.95rem; line-height:1.75; margin:0;">For direct-download APK refund requests, email <a href="mailto:support@tracmeds.com" style="color:var(--violet-dark); font-weight:600;">support@tracmeds.com</a> with your order reference, payment date, and a brief explanation. We will review the request and respond within a reasonable timeframe. For iOS refund requests, contact Apple directly using the link above. For Google Play Store refund requests, use the Google Play subscriptions page above.</p>
         </div>
       </div>
     </section>
