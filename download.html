@@ -7,9 +7,9 @@
   <meta name="application-name" content="TracMeds" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <title>Download TracMeds APK — Medicine Reminder App for Android, iPhone &amp; Apple Watch</title>
-  <meta name="description" content="Download TracMeds for Android (APK) and iPhone (App Store), with a watchOS companion app. Track medicines, appointments, and health readings, and share a daily summary with your family." />
-  <meta name="keywords" content="TracMeds, TracMeds APK, TracMeds download, medicine reminder app, medication tracker, family health app, Android APK download, iPhone health app, Apple Watch medicine reminder" />
+  <title>Download TracMeds — Medicine Reminder App for Android, iPhone &amp; Apple Watch</title>
+  <meta name="description" content="Download TracMeds for Android (Google Play) and iPhone (App Store), with a watchOS companion app. Track medicines, appointments, and health readings, and share a daily summary with your family." />
+  <meta name="keywords" content="TracMeds, TracMeds download, TracMeds Google Play, medicine reminder app, medication tracker, family health app, Android health app, iPhone health app, Apple Watch medicine reminder" />
   <meta name="author" content="TracMeds" />
   <meta name="geo.region" content="IN" />
 
@@ -51,15 +51,14 @@
     "image": "https://www.tracmeds.com/appstore-link-preview.png",
     "applicationCategory": "HealthApplication",
     "operatingSystem": "iOS, Android, watchOS",
-    "softwareVersion": "10.0.0",
-    "downloadUrl": "https://github.com/anurmarc22/website-tracmeds/releases/download/v10.0.0/tracmeds.v10.0.0.apk",
+    "downloadUrl": "https://play.google.com/store/apps/details?id=com.tracmeds.app",
     "inLanguage": "en",
     "publisher": {
       "@type": "Organization",
       "name": "TracMeds",
       "url": "https://www.tracmeds.com/"
     },
-    "sameAs": ["https://x.com/tracmeds", "https://apps.apple.com/in/app/tracmeds/id6802199272"]
+    "sameAs": ["https://x.com/tracmeds", "https://apps.apple.com/in/app/tracmeds/id6802199272", "https://play.google.com/store/apps/details?id=com.tracmeds.app"]
   }
   </script>
   <script type="application/ld+json">
@@ -160,6 +159,18 @@
     }
     .btn[hidden]{ display:none !important; }
     .btn-primary { background: linear-gradient(100deg, var(--violet) 0%, var(--amber) 100%); color: #0c1530; }
+    .store-badges {
+      display: flex; justify-content: center; align-items: center; flex-wrap: wrap;
+      gap: 16px; margin: 22px auto 26px;
+    }
+    .store-badge {
+      display: inline-flex; border-radius: 10px;
+      transition: transform .22s ease, box-shadow .22s ease;
+    }
+    .store-badge img { display: block; height: 52px; width: auto; }
+    .store-badge:hover { transform: translateY(-3px); box-shadow: 0 14px 28px rgba(0,0,0,.4), 0 4px 10px rgba(111,79,216,.3); }
+    .store-badge:focus-visible { outline: 3px solid #dcd3ff; outline-offset: 3px; }
+    body[data-apk="off"] .apk-only { display: none !important; }
     .trouble-link { color: rgba(255, 255, 255, 0.65); font-size: 0.88rem; text-decoration: underline; }
     .hero-preview {
       display: block; margin: 8px auto 26px; border-radius: 20px; overflow: hidden;
@@ -200,10 +211,21 @@
     @media (max-width: 640px) {
       .card { padding: 24px; }
       .btn { width: 100%; }
+      .store-badges { gap: 12px; }
+      .store-badge img { height: 46px; }
+    }
+    @media (max-width: 400px) {
+      .store-badge img { height: 40px; }
     }
   </style>
 </head>
-<body>
+<!--
+  ANDROID APK SWITCH
+  To SHOW the "Download for Android" (APK v10.0.0) button and the install steps,
+  change data-apk="off" to data-apk="on" in the <body> line below.
+  To hide them again, change it back to "off". Nothing else needs to change.
+-->
+<body data-apk="off">
   <div class="page-center">
   <main class="card">
     <a href="/index.html" style="display: inline-flex; align-items: center; gap: 10px; margin-bottom: 16px; text-decoration: none;">
@@ -212,11 +234,16 @@
     </a>
     <div class="badge">✓ Thank you</div>
     <h1 style="color: var(--blue);">Download TracMeds</h1>
-    <div class="actions">
-      <a id="btnAppStore" class="btn btn-primary" href="https://apple.co/4xOYWCl" target="_blank" rel="noopener noreferrer" style="gap:8px;">
-        <svg width="18" height="18" viewBox="0 0 384 512" fill="currentColor" aria-hidden="true"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141 8 184.8 8 273.5c0 26.2 4.8 53.3 14.4 81.2 12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-65.7-90-65.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>
-        <span>Download on the App Store</span>
+    <div class="store-badges" role="group" aria-label="Download TracMeds">
+      <a id="btnAppStore" class="store-badge" href="https://apple.co/4xOYWCl" target="_blank" rel="noopener noreferrer">
+        <img src="appstore-badge.svg" alt="Download on the App Store" />
       </a>
+      <a id="btnGooglePlay" class="store-badge" href="https://play.google.com/store/apps/details?id=com.tracmeds.app" target="_blank" rel="noopener noreferrer">
+        <img src="google-play-badge.svg" alt="Get it on Google Play" />
+      </a>
+    </div>
+
+    <div class="actions apk-only">
       <a id="btnPrimary" class="btn btn-primary" href="https://github.com/anurmarc22/website-tracmeds/releases/download/v10.0.0/tracmeds.v10.0.0.apk" download="tracmeds.apk" rel="noopener">Download for Android</a>
     </div>
 
@@ -224,7 +251,7 @@
       <img src="appstore-link-preview.png" width="1200" height="628" alt="TracMeds — New launch alert. Ready. Set. Get. Download on the App Store." />
     </a>
 
-    <div class="status-box">
+    <div class="status-box apk-only">
       <strong>How to install — for Android phones only</strong>
       <ul>
         <li>Open the downloaded APK file from your phone’s Downloads folder.</li>
