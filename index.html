@@ -1,4 +1,4 @@
-a<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -279,8 +279,9 @@ a<!DOCTYPE html>
     padding:18px;
     background-image:radial-gradient(circle at top left, rgba(242,169,27,0.28), transparent 32%), radial-gradient(circle at bottom right, rgba(111,79,216,0.28), transparent 34%);
   }
-  .showcase-slide{ display:none; animation:fade .55s ease; }
-  .showcase-slide.active{ display:block; }
+  .showcase-frame{ display:grid; }
+  .showcase-slide{ grid-area:1 / 1; visibility:hidden; opacity:0; pointer-events:none; }
+  .showcase-slide.active{ visibility:visible; opacity:1; pointer-events:auto; animation:fade .55s ease; }
   @keyframes fade{ from{ opacity:0; transform:translateY(8px) scale(.985);} to{ opacity:1; transform:translateY(0) scale(1);} }
   .showcase-topbar{ display:flex; align-items:center; gap:8px; margin-bottom:16px; }
   .showcase-topbar .dot-pill{ width:10px; height:10px; border-radius:50%; background:rgba(255,255,255,.45); }
