@@ -162,6 +162,8 @@
   }
   .nav-appstore-badge{ display:inline-flex; align-items:center; flex:none; }
   .nav-appstore-badge img{ display:block; height:40px; width:auto; }
+  .nav-badges{ display:flex; align-items:center; gap:10px; flex:none; }
+  @media (max-width:600px){ .nav-badges{ flex-direction:column; align-items:flex-start; gap:8px; } }
 
   /* hero */
   .hero{
@@ -492,9 +494,14 @@
         <a href="#refund-policy">Refund Policy</a>
         <a href="#contact">Contact</a>
       </div>
-      <a class="nav-appstore-badge" href="https://apple.co/4xOYWCl" target="_blank" rel="noopener noreferrer">
-        <img src="appstore-badge.svg" alt="Download on the App Store" />
-      </a>
+      <div class="nav-badges">
+        <a class="nav-appstore-badge" href="https://apple.co/4xOYWCl" target="_blank" rel="noopener noreferrer">
+          <img src="appstore-badge.svg" alt="Download on the App Store" />
+        </a>
+        <a class="nav-appstore-badge" href="https://play.google.com/store/apps/details?id=com.tracmeds.app" target="_blank" rel="noopener noreferrer">
+          <img src="google-play-badge.svg" alt="Get it on Google Play" />
+        </a>
+      </div>
     </div>
   </nav>
 
